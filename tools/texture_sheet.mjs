@@ -108,7 +108,7 @@ async function run() {
     renderer.setSize(CW, CH, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 0.82;
     THREE.ColorManagement.enabled = true;
 
     /* ---- procedural studio environment (gradient sky + soft window) ---- */

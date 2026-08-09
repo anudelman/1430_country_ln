@@ -47,7 +47,7 @@ ROOM.** This is deliberate. Do not "fix" it in either direction — just use the
 
 | Level | Finished floor Y | Ceiling height | Ceiling Y |
 |---|---|---|---|
-| Basement | `LEVELS.basement = -9.0` | 7.75 | −1.25 |
+| Basement | `LEVELS.basement = -9.0` | **7.49** (measured, not 7.75) | −1.51 |
 | First floor | `LEVELS.first = 0.0` | 8.5 | 8.5 |
 | Second floor | `LEVELS.second = 9.5` | 8.0 | 17.5 |
 
@@ -153,8 +153,23 @@ camera therefore always looks horizontally (pitch = 0) and uses an off-axis
 (shifted) frustum to include more ceiling or floor. `camera.js` exposes
 `makeShiftCamera({fovV, aspect, shift})`. A preset with non-zero pitch is a bug.
 
-Typical listing-photo optics: 16–24mm full-frame → **vertical FOV 55–75°**,
-camera height **4.6–5.4 ft**, aspect **3:2**.
+**These optics are MEASURED, not assumed** — see `docs/PHOTOGRAPHY.md` for the derivation
+(two-vanishing-point calibration on `family_room_1.png` and `master_bedroom_1.png`, f = 625/631 px,
+cross-checked against the floor plan to within 0.5 ft and 1.7°). They supersede all earlier
+estimates in this file:
+
+| parameter | value |
+|---|---|
+| `fovV` interior | **78.5°** (≈14.6 mm equiv, hFOV 101.5°) — far wider than a typical guess |
+| `fovV` exterior | **64°** |
+| `shift` | **0.00** — the horizon sits within ±7 px of frame centre in every photo |
+| camera height | **4.00 ft** first floor, **4.05** second, **3.90** basement — low, not eye height |
+| aspect / render size | **1.505** / **1526×1014** |
+| lens distortion | **0.0** — fully corrected (measured sag ≤0.6 px over 700 px) |
+| residual pitch | **±0.25°** — the real photos are corrected only to ~0.3°, so a *perfectly* plumb render is marginally cleaner than the reference |
+
+Interactive walk mode may use a normal eye height (~5.6 ft); **screenshots always use the table
+above.**
 
 ## 6. Look & render settings (locked in `renderer.js`)
 
@@ -162,14 +177,35 @@ camera height **4.6–5.4 ft**, aspect **3:2**.
 - `toneMapping = ACESFilmicToneMapping`, `toneMappingExposure` per scene
 - `shadowMap.type = PCFSoftShadowMap`, 2048 maps
 - Physically-based light units; `THREE.ColorManagement.enabled = true`
-- Post chain: mild bloom on light sources → subtle chromatic aberration →
-  vignette → film grain → highlight rolloff. Never crush blacks.
+### The post chain, corrected by measurement
 
-Photographic notes that matter for the blind test:
-- Real listing shots are **bracketed/flash-blended**: shadows are *open*,
-  windows are *slightly blown but not clipped white*, no black corners.
-- Every artificial light is **on** in listing photos, even in daylight.
-- White balance is neutral-to-slightly-warm indoors (~4600K look).
+An earlier draft of this file prescribed bloom, chromatic aberration, vignette and film grain.
+**All four were measured as ABSENT from the real photographs.** Adding them does not make our
+renders look photographic — it makes them *easier* to pick out. The one thing the photos DO have
+that renders lack is a sharpening halo.
+
+| stage | setting | measured evidence |
+|---|---|---|
+| bloom | threshold **0.98**, strength **0.06**, radius 0.15 (≈off) | ceiling 6 px from a 254-level can sits at its normal 193–197 |
+| chromatic aberration | **0.00 px** | ≤0.03 px at r>700 |
+| vignette | **0.02** (max 0.04) | none — the corners are actually *brighter* |
+| film grain | **0.0006** (0.15/255) | σ 0.11–0.16 |
+| **unsharp mask — ADD THIS** | radius **0.9 px**, amount **0.55** | every high-contrast edge carries a +36/−24 halo at ±1 px |
+| `toneMappingExposure` | **1.15** interior, **0.95** exterior | calibrate so a white wall reads **188±6** and the frame median is **185–195** |
+| black point | lift the floor to **14/255** | <0.3% of pixels below L=8; ordinary shadow bottoms sit at L 25–70 |
+| white point | p99.9 = **250–254**, **≤0.15%** pure white | window medians 144–195, exterior stays fully legible |
+
+### Lighting ratios (also measured)
+
+- ambient fill : key, interior = **0.55 : 1**. Deepest occlusion only 0.31 linear.
+- **No dark AO line in drywall corners.** A wall/ceiling junction gradates smoothly 190→184 over
+  ~150 px with no local minimum. A contact-shadow crease there is a giveaway.
+- sun patch : ambient on the floor = **1.5 : 1 linear**. Under-cabinet shadow is only 3–13% down.
+- exterior sun : sky fill = **5 : 1 linear**.
+- Shadows are **warm** (+4 to +5 R−B at L≈130). Never tint them blue.
+- Walls are not flat washes: one blank basement wall spans 132→194, a 32% gradient.
+- Depth of field **off** — everything from 2.5 ft to 60 ft resolves to 2-px edges.
+- Every artificial fixture is **ON** in every photo, even in daylight.
 
 ## 7. Judged pieces
 

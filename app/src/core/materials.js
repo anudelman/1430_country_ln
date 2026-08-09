@@ -221,9 +221,9 @@ export function makeMaterials(THREE, opts = {}) {
 
   M.cherryCabinetDark = withMaps(THREE, phys(THREE, {
     metalness: 0.0,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.2,
-    envMapIntensity: 0.9,
+    clearcoat: 0.40,
+    clearcoatRoughness: 0.28,
+    envMapIntensity: 0.85,
   }), T('cherryCabinetDark'), { normalScale: 0.9 });
 
   M.butcherBlock = withMaps(THREE, phys(THREE, {
