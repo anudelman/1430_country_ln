@@ -54,7 +54,7 @@ export const QUALITY_PROFILES = Object.freeze({
     shadowMapSize: 1536,
     maxPixelRatio: 1.75,
     anisotropy: 8,
-    envResolution: 192,
+    envResolution: 256,
     bloom: true,
     softShadows: true,
     shadowRadius: 2.5,

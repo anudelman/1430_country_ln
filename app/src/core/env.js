@@ -231,7 +231,6 @@ export function makeSkyEnv(renderer, {
   captureScene.add(capture);
 
   const pmrem = new THREE.PMREMGenerator(renderer);
-  pmrem.compileCubemapShader();
   const renderTarget = pmrem.fromScene(captureScene, 0.0, 0.1, 100, { size: res });
   pmrem.dispose();
 
@@ -305,7 +304,7 @@ void main() {
 
   // One bright window wall so the bounce has a direction instead of being a
   // flat grey dome. Horizontal lobe, gently faded above and below the head.
-  vec3 hdir = normalize( vec3( dir.x, 0.0, dir.z ) + vec3( 1e-5 ) );
+  vec3 hdir = normalize( vec3( dir.x + 1e-5, 0.0, dir.z + 1e-5 ) );
   float w = pow( max( dot( hdir, normalize( uWindowDir ) ), 0.0 ), uWindowTight );
   w *= 1.0 - smoothstep( 0.10, 0.62, abs( up ) );
   col += uWindow * w;
@@ -383,7 +382,6 @@ export function makeIndoorEnv(renderer, {
   scene.add(box);
 
   const pmrem = new THREE.PMREMGenerator(renderer);
-  pmrem.compileCubemapShader();
   const renderTarget = pmrem.fromScene(scene, blur, 0.1, 100, { size: res });
   pmrem.dispose();
 
