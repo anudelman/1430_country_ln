@@ -214,8 +214,20 @@ async function loadModules() {
   ]);
 }
 
-/** Materials/textures/kit are expensive; only build them when a room needs them. */
+/**
+ * Materials/textures/kit are expensive; only build them when a room needs them.
+ *
+ * The library is built ONCE and shared by every level, so `disposeScene` must
+ * never dispose one of its materials — the next level would render black.
+ *
+ * materials.js is LAZY: `mat.redOakFloor` builds that one material (and
+ * generates only its procedural maps) on first read. So we must NOT enumerate
+ * the library to find out which materials are shared — that would build all 42
+ * and cost minutes. Every library material (and every applyUV clone of one)
+ * carries `userData.keep = true` instead, and `disposeScene` honours that.
+ */
 let assetPromise = null;
+
 function loadAssets() {
   if (!assetPromise) {
     assetPromise = (async () => {
@@ -513,9 +525,16 @@ function disposeScene() {
     const m = o.material;
     if (!m) return;
     for (const mm of Array.isArray(m) ? m : [m]) {
-      if (mm && typeof mm.dispose === 'function') mm.dispose();
+      if (!mm || typeof mm.dispose !== 'function') continue;
+      // Never dispose a material owned by the shared library (they and their
+      // applyUV clones carry userData.keep), or one a room module marked keep.
+      if (mm.userData && mm.userData.keep) continue;
+      mm.dispose();
     }
   });
+  if (mod.materials && typeof mod.materials.clearUVClones === 'function') {
+    try { mod.materials.clearUVClones(); } catch { /* ignore */ }
+  }
   scene = null;
 }
 
@@ -1123,6 +1142,12 @@ function installApi() {
 async function boot() {
   const t0 = Date.now();
   if (SHOT) document.body.classList.add('shot');
+
+  // Harness self-test: `?selftest=fail` proves that a fatal boot is REPORTED
+  // (via __BOOT_ERROR__) rather than silently hanging shoot.mjs for 240 s.
+  if (params.get('selftest') === 'fail') {
+    throw new Error('selftest=fail — deliberate boot failure, this is not a real error');
+  }
 
   await loadModules();
   await loadPresets();

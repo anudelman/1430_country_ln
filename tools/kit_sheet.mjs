@@ -338,7 +338,13 @@ async function run() {
 
         const maxDim = Math.max(sz.x, sz.y, sz.z);
         const dist = maxDim * 2.55 + 1.2;
-        const dir = new THREE.Vector3(0.66, 0.45, 1).normalize();
+        // three-quarter view relative to the object's own proportions: a long
+        // run (a stair, a railing) gets seen from the side, not end-on
+        const dir = new THREE.Vector3(
+          0.45 + 0.85 * (sz.z / (sz.x + sz.z + 1e-6)),
+          0.44,
+          0.45 + 0.85 * (sz.x / (sz.x + sz.z + 1e-6))
+        ).normalize();
         camera.position.copy(ctr).addScaledVector(dir, dist);
         camera.lookAt(ctr);
         camera.near = Math.max(0.02, dist * 0.02);

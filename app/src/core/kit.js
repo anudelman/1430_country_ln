@@ -437,6 +437,142 @@ export function makeKit(THREE, mat, tex) {
     return m;
   }
 
+  /**
+   * A flat plate with real holes punched through it, chamfered on every edge.
+   * This is how every paneled door skin, porthole and louver frame in the kit
+   * is made: a genuine opening reads completely differently from a texture or
+   * an overlaid box, because the hole's chamfer catches its own highlight.
+   *
+   * @param {number} w plate width (X)
+   * @param {number} h plate height (Y)
+   * @param {Array} holes  rect holes as [x0,y0,x1,y1] or {circle:true,x,y,r}
+   * @param {number} depth total thickness in Z
+   * @returns {THREE.Mesh} spanning z = 0 .. depth, centred in X and Y
+   */
+  function plateWithHoles(w, h, holes, depth, material, o = {}) {
+    const s = new THREE.Shape();
+    const bx = w / 2, by = h / 2;
+    s.moveTo(-bx, -by); s.lineTo(bx, -by); s.lineTo(bx, by); s.lineTo(-bx, by);
+    s.closePath();
+    for (const hl of holes || []) {
+      const p = new THREE.Path();
+      if (hl && hl.circle) p.absarc(hl.x, hl.y, hl.r, 0, TAU, true);
+      else {
+        p.moveTo(hl[0], hl[1]); p.lineTo(hl[0], hl[3]);
+        p.lineTo(hl[2], hl[3]); p.lineTo(hl[2], hl[1]); p.closePath();
+      }
+      s.holes.push(p);
+    }
+    const bev = o.bevel === undefined ? inch(0.05) : o.bevel;
+    const useBev = bev > 1e-5 && depth > 3 * bev;
+    const geo = new THREE.ExtrudeGeometry(s, {
+      depth: useBev ? depth - 2 * bev : depth,
+      bevelEnabled: useBev,
+      bevelThickness: bev, bevelSize: bev, bevelOffset: 0, bevelSegments: 1,
+      curveSegments: o.curveSegments || 48,
+      steps: 1,
+    });
+    geo.translate(0, 0, useBev ? bev : 0);
+    // ExtrudeGeometry emits UVs in shape units (feet) — rescale to the
+    // material's real-world tile so applyUV is not needed.
+    const sf = uvs(material);
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / sf[0], uv.getY(i) / sf[1]);
+    uv.needsUpdate = true;
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, material);
+    m.castShadow = o.cast !== false;
+    m.receiveShadow = true;
+    return m;
+  }
+
+  /** Elliptical annulus, optionally extruded. @returns Mesh centred at origin. */
+  function ellipseRing(rxOut, ryOut, rxIn, ryIn, depth, material, o = {}) {
+    const s = new THREE.Shape();
+    s.absellipse(0, 0, rxOut, ryOut, 0, TAU, false);
+    if (rxIn > 0 && ryIn > 0) {
+      const p = new THREE.Path();
+      p.absellipse(0, 0, rxIn, ryIn, 0, TAU, true);
+      s.holes.push(p);
+    }
+    let geo;
+    if (depth > 1e-5) {
+      geo = new THREE.ExtrudeGeometry(s, {
+        depth, bevelEnabled: false, curveSegments: o.curveSegments || 64, steps: 1,
+      });
+    } else {
+      geo = new THREE.ShapeGeometry(s, o.curveSegments || 64);
+    }
+    const sf = uvs(material);
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / sf[0], uv.getY(i) / sf[1]);
+    uv.needsUpdate = true;
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, material);
+    m.castShadow = o.cast !== false; m.receiveShadow = true;
+    return m;
+  }
+
+  /**
+   * Procedural flame alpha mask (canvas, no asset files).  Tongues of flame
+   * that fade out at the tips, so the emissive plane in `gasFireplace` reads
+   * as fire rather than a glowing rectangle.
+   */
+  let FLAME_TEX = null;
+  function flameAlpha() {
+    if (FLAME_TEX) return FLAME_TEX;
+    if (typeof document === 'undefined') return null;
+    const W = 256, H = 256;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    x.fillStyle = '#000';
+    x.fillRect(0, 0, W, H);
+    let seed = 20240917;
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    const tongues = 9;
+    for (let i = 0; i < tongues; i++) {
+      const cx = W * (0.08 + 0.84 * ((i + 0.5) / tongues + (rnd() - 0.5) * 0.05));
+      const bw = W * (0.055 + rnd() * 0.055);
+      const th = H * (0.42 + rnd() * 0.5);
+      const g2 = x.createLinearGradient(0, H, 0, H - th);
+      g2.addColorStop(0.0, 'rgba(255,255,255,0.95)');
+      g2.addColorStop(0.35, 'rgba(255,255,255,0.75)');
+      g2.addColorStop(0.75, 'rgba(255,255,255,0.22)');
+      g2.addColorStop(1.0, 'rgba(255,255,255,0)');
+      x.fillStyle = g2;
+      x.beginPath();
+      x.moveTo(cx - bw, H);
+      x.quadraticCurveTo(cx - bw * 0.85, H - th * 0.55, cx + (rnd() - 0.5) * bw, H - th);
+      x.quadraticCurveTo(cx + bw * 0.85, H - th * 0.55, cx + bw, H);
+      x.closePath();
+      x.fill();
+    }
+    // ember glow along the log line
+    const gl2 = x.createLinearGradient(0, H, 0, H * 0.72);
+    gl2.addColorStop(0, 'rgba(255,255,255,0.9)');
+    gl2.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gl2;
+    x.fillRect(0, H * 0.72, W, H * 0.28);
+    // fade the vertical edges so the plane never shows a hard border
+    x.globalCompositeOperation = 'destination-in';
+    const fade = x.createLinearGradient(0, 0, W, 0);
+    fade.addColorStop(0.0, 'rgba(0,0,0,0)');
+    fade.addColorStop(0.14, 'rgba(0,0,0,1)');
+    fade.addColorStop(0.86, 'rgba(0,0,0,1)');
+    fade.addColorStop(1.0, 'rgba(0,0,0,0)');
+    x.fillStyle = fade;
+    x.fillRect(0, 0, W, H);
+    x.globalCompositeOperation = 'source-over';
+    FLAME_TEX = new THREE.CanvasTexture(c);
+    FLAME_TEX.colorSpace = THREE.NoColorSpace;
+    FLAME_TEX.needsUpdate = true;
+    return FLAME_TEX;
+  }
+
   /** New anchored group. */
   function G(anchor, size) {
     const g = new THREE.Group();
@@ -1092,42 +1228,29 @@ export function makeKit(THREE, mat, tex) {
       rowYs.push([y, y + hs[2]]);
     }
 
-    const zf = [core / 2 + fd / 2, -(core / 2 + fd / 2)];
-    for (const z of zf) {
-      // stiles full height
-      for (const s of [-1, 1]) {
-        const b2 = box(stile, h, fd, m, { r: R_PAINT, uv: true });
-        b2.position.set(s * (w / 2 - stile / 2), h / 2, z);
-        g.add(b2);
-      }
-      if (cols === 2) {
-        const b2 = box(mull, h, fd, m, { r: R_PAINT, uv: true });
-        b2.position.set(0, h / 2, z);
-        g.add(b2);
-      }
-      // rails span the full width (the overlap at the joints reads as joinery)
-      const railBands = [[0, rowYs[0][0]], [rowYs[rows - 1][1], h]];
-      for (let i = 0; i < rows - 1; i++) railBands.push([rowYs[i][1], rowYs[i + 1][0]]);
-      for (const [ya, yb] of railBands) {
-        const b2 = box(w - 2 * stile + inch(0.04), yb - ya, fd, m, { r: R_PAINT, uv: true });
-        b2.position.set(0, (ya + yb) / 2, z);
-        g.add(b2);
-      }
-      // panel sticking: a bevel from the frame face down to the panel field
-      const sgn = z > 0 ? 1 : -1;
-      for (const [xa, xb] of colXs) {
-        for (const [ya, yb] of rowYs) {
-          g.add(stickingRing(xa, ya, xb, yb, sgn * (core / 2 + fd), sgn * (core / 2),
-            inch(0.42), m));
-          if (o.raised !== false) {
-            const rp = box(xb - xa - inch(1.0), yb - ya - inch(1.0), inch(0.14), m,
-              { r: inch(0.07), seg: 2, uv: true });
-            rp.position.set((xa + xb) / 2, (ya + yb) / 2, sgn * (core / 2 + inch(0.07)));
-            g.add(rp);
-          }
+    // the panel openings, as rectangles in leaf coordinates
+    const rects = [];
+    for (const [xa, xb] of colXs) for (const [ya, yb] of rowYs) rects.push([xa, ya, xb, yb]);
+
+    // skins: one real plate per face with the panel openings punched through
+    for (const sgn of [1, -1]) {
+      const skin = plateWithHoles(w, h,
+        rects.map(([xa, ya, xb, yb]) => [xa, ya - h / 2, xb, yb - h / 2]),
+        fd, m, { bevel: inch(0.045) });
+      skin.position.set(0, h / 2, sgn > 0 ? core / 2 : -core / 2 - fd);
+      g.add(skin);
+      for (const [xa, ya, xb, yb] of rects) {
+        g.add(stickingRing(xa, ya, xb, yb, sgn * (core / 2 + fd), sgn * (core / 2),
+          inch(0.42), m));
+        if (o.raised !== false) {
+          const rp = box(xb - xa - inch(1.1), yb - ya - inch(1.1), inch(0.13), m,
+            { r: inch(0.06), seg: 2, uv: true });
+          rp.position.set((xa + xb) / 2, (ya + yb) / 2, sgn * (core / 2 + inch(0.065)));
+          g.add(rp);
         }
       }
     }
+    void mull;
     return g;
   }
 
@@ -1464,91 +1587,73 @@ export function makeKit(THREE, mat, tex) {
     const bl = P.black;
     const fd = inch(0.32);
     const core = t - 2 * fd;
-    const slab = box(lw, lh, core, bl, { r: R_EASE, uv: true });
-    slab.position.y = lh / 2;
-    leaf.add(slab);
 
     // ---- layout: porthole above, three panel columns below --------------
     const stile = inch(4.6);
     const railT = inch(4.2), railB = inch(9.5);
-    const portR = Math.min(lw * 0.36, inch(11.5));
-    const portY = lh - railT - portR - inch(4.5);
-    const panelTop = portY - portR - inch(5.0);
+    const portR = Math.min(lw * 0.34, inch(11.0));
+    const portY = lh - railT - portR - inch(5.0);
+    const panelTop = portY - portR - inch(6.0);
     const fieldW = lw - 2 * stile;
     const centreW = fieldW * 0.40;
-    const sideW = (fieldW - centreW - 2 * inch(4.4)) / 2;
+    const mullW = inch(4.4);
+    const sideW = (fieldW - centreW - 2 * mullW) / 2;
+    const midY = railB + (panelTop - railB) * 0.62;
+    const cx0 = -centreW / 2, cx1 = centreW / 2;
 
-    for (const zs of [1, -1]) {
-      const z = zs * (core / 2 + fd / 2);
-      const sgn = zs;
-      for (const s of [-1, 1]) {
-        const b2 = box(stile, lh, fd, bl, { r: R_PAINT });
-        b2.position.set(s * (lw / 2 - stile / 2), lh / 2, z);
-        leaf.add(b2);
+    const rects = [[cx0, railB, cx1, panelTop]];
+    for (const s of [-1, 1]) {
+      const a = s < 0 ? -(centreW / 2 + mullW + sideW) : centreW / 2 + mullW;
+      const b2 = a + sideW;
+      rects.push([a, railB, b2, midY - inch(2.1)]);
+      rects.push([a, midY + inch(2.1), b2, panelTop]);
+    }
+    const port = { circle: true, x: 0, y: portY - lh / 2, r: portR };
+
+    // the core is a real plate with a real hole through it for the porthole
+    const slab = plateWithHoles(lw, lh, [port], core, bl, { bevel: inch(0.05) });
+    slab.position.set(0, lh / 2, -core / 2);
+    leaf.add(slab);
+
+    // skins: panel openings AND the porthole punched through, both faces
+    for (const sgn of [1, -1]) {
+      const skin = plateWithHoles(lw, lh,
+        rects.map(([xa, ya, xb, yb]) => [xa, ya - lh / 2, xb, yb - lh / 2]).concat([port]),
+        fd, bl, { bevel: inch(0.05) });
+      skin.position.set(0, lh / 2, sgn > 0 ? core / 2 : -core / 2 - fd);
+      leaf.add(skin);
+      for (const [xa, ya, xb, yb] of rects) {
+        leaf.add(stickingRing(xa, ya, xb, yb, sgn * (core / 2 + fd), sgn * (core / 2),
+          inch(0.55), bl));
       }
-      const topBand = box(lw - 2 * stile + inch(0.05), lh - panelTop, fd, bl, { r: R_PAINT });
-      topBand.position.set(0, (panelTop + lh) / 2, z);
-      leaf.add(topBand);
-      const botBand = box(lw - 2 * stile + inch(0.05), railB, fd, bl, { r: R_PAINT });
-      botBand.position.set(0, railB / 2, z);
-      leaf.add(botBand);
-      // mullions between the three panel columns
-      for (const s of [-1, 1]) {
-        const b2 = box(inch(4.4), panelTop - railB, fd, bl, { r: R_PAINT });
-        b2.position.set(s * (centreW / 2 + inch(2.2)), (railB + panelTop) / 2, z);
-        leaf.add(b2);
-      }
-      // mid rail splitting the side panels
-      const midY = railB + (panelTop - railB) * 0.62;
-      for (const s of [-1, 1]) {
-        const b2 = box(sideW, inch(4.2), fd, bl, { r: R_PAINT });
-        b2.position.set(s * (centreW / 2 + inch(4.4) + sideW / 2), midY, z);
-        leaf.add(b2);
-      }
-      // panel stickings
-      const cx0 = -centreW / 2, cx1 = centreW / 2;
-      leaf.add(stickingRing(cx0, railB, cx1, panelTop, sgn * (core / 2 + fd),
-        sgn * (core / 2), inch(0.5), bl));
-      for (const s of [-1, 1]) {
-        const a = s * (centreW / 2 + inch(4.4));
-        const b2 = a + s * sideW;
-        const x0 = Math.min(a, b2), x1 = Math.max(a, b2);
-        leaf.add(stickingRing(x0, railB, x1, midY - inch(2.1),
-          sgn * (core / 2 + fd), sgn * (core / 2), inch(0.5), bl));
-        leaf.add(stickingRing(x0, midY + inch(2.1), x1, panelTop,
-          sgn * (core / 2 + fd), sgn * (core / 2), inch(0.5), bl));
-      }
-      // reeded centre panel: vertical half-round flutes
+      // reeded centre panel: vertical half-round flutes in the tall panel
       const flutes = 11;
-      const fw = centreW * 0.86 / flutes;
+      const fw = (centreW - inch(2.6)) / flutes;
       for (let i = 0; i < flutes; i++) {
-        const fl = cyl(fw * 0.5, fw * 0.5, panelTop - railB - inch(1.6), bl, 10, { open: false });
-        fl.position.set(-centreW * 0.43 + fw * (i + 0.5), (railB + panelTop) / 2,
-          sgn * (core / 2 + fw * 0.22));
-        fl.scale.z = 0.55;
+        const fl = cyl(fw * 0.5, fw * 0.5, panelTop - railB - inch(3.0), bl, 10);
+        fl.position.set(-(centreW - inch(2.6)) / 2 + fw * (i + 0.5), (railB + panelTop) / 2,
+          sgn * (core / 2 - inch(0.02)));
+        fl.scale.z = 0.62;
         leaf.add(fl);
       }
-    }
-
-    // ---- porthole: bevelled black ring + textured frosted glass ---------
-    const ringOut = portR + inch(1.6);
-    for (const zs of [1, -1]) {
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(portR, ringOut, 64), bl);
-      ring.position.set(0, portY, zs * (core / 2 + fd * 0.55));
-      if (zs < 0) ring.rotation.y = Math.PI;
-      ring.castShadow = true; ring.receiveShadow = true;
+      // the porthole gets a proud bevelled ring on each face
+      const ring = ellipseRing(portR + inch(1.7), portR + inch(1.7), portR, portR,
+        inch(0.30), bl, { curveSegments: 64 });
+      ring.position.set(0, portY, sgn > 0 ? core / 2 + fd : -core / 2 - fd - inch(0.30));
       leaf.add(ring);
-      const lip = torus(portR + inch(0.15), inch(0.22), bl, 56, 8);
-      lip.position.set(0, portY, zs * (core / 2 + fd * 0.5));
+      const lip = torus(portR + inch(0.16), inch(0.20), bl, 64, 8);
+      lip.position.set(0, portY, sgn * (core / 2 + fd + inch(0.16)));
       leaf.add(lip);
     }
-    const gl = new THREE.Mesh(new THREE.CircleGeometry(portR + inch(0.3), 64), P.frosted);
+
+    // textured frosted glass filling the porthole
+    const gl = new THREE.Mesh(new THREE.CircleGeometry(portR + inch(0.25), 64), P.frosted);
     gl.position.set(0, portY, 0);
     gl.receiveShadow = true;
     leaf.add(gl);
-    const gl2 = gl.clone();
+    const gl2 = new THREE.Mesh(new THREE.CircleGeometry(portR + inch(0.25), 64), P.frosted);
     gl2.rotation.y = Math.PI;
+    gl2.position.set(0, portY, -inch(0.06));
     leaf.add(gl2);
 
     // ---- handleset: long black backplate, lever, deadbolt ---------------
@@ -1584,19 +1689,28 @@ export function makeKit(THREE, mat, tex) {
       const sides = o.sidelights === 'left' ? [-1] : o.sidelights === 'right' ? [1] : [-1, 1];
       for (const s of sides) {
         const cx = s * (w / 2 + jt + sw / 2);
-        const fr = box(sw + 2 * jt, h + jt, wall, jamb, { r: R_PAINT });
-        fr.position.set(cx, (h + jt) / 2, 0);
-        g.add(fr);
-        const light = new THREE.Mesh(new THREE.PlaneGeometry(sw, h), P.glass);
-        light.position.set(cx, h / 2, -inch(1.2));
-        g.add(light);
-        for (const yy of [0]) void yy;
-        const sh = plantationShutters(sw, h, {
-          panels: 1, divider: 0.52, tilt: deg(24), material: P.trimWhite,
+        // jamb legs + head only — never a solid panel across the light
+        for (const sx of [-1, 1]) {
+          const leg = box(jt, h + jt, wall, jamb, { r: R_PAINT });
+          leg.position.set(cx + sx * (sw / 2 + jt / 2), (h + jt) / 2, 0);
+          g.add(leg);
+        }
+        const hd2 = box(sw + 2 * jt, jt, wall, jamb, { r: R_PAINT });
+        hd2.position.set(cx, h + jt / 2, 0);
+        g.add(hd2);
+        const sash = sashFrame(sw, h, {
+          material: jamb, stile: inch(2.0), rail: inch(2.4), glass: P.glass,
+          thickness: inch(1.8),
         });
-        sh.position.set(cx, 0, wall / 2 - inch(1.6));
+        sash.position.set(cx, h / 2, -wall / 2 + inch(1.6));
+        g.add(sash);
+        // white plantation shutters on the inside face
+        const sh = plantationShutters(sw - inch(0.4), h - inch(0.4), {
+          panels: 1, divider: 0.52, tilt: deg(22), material: P.trimWhite,
+        });
+        sh.position.set(cx, inch(0.2), wall / 2 - inch(3.4));
         g.add(sh);
-        const sc = doorCasing({ w: sw + 2 * jt, h: h + jt, material: P.trimWhite });
+        const sc = windowCasing({ w: sw + 2 * jt, h: h + jt, material: P.trimWhite, picture: true });
         sc.position.set(cx, 0, wall / 2);
         g.add(sc);
       }
@@ -1670,28 +1784,28 @@ export function makeKit(THREE, mat, tex) {
 
     if (type === 'oval' || type === 'round') {
       const rx = w / 2, ry = type === 'round' ? w / 2 : h / 2;
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(1, inch(1.5), 10, 72), m);
-      ring.scale.set(rx - inch(1.5), ry - inch(1.5), 1);
-      ring.position.set(0, ry, zSash);
-      ring.castShadow = true; ring.receiveShadow = true;
-      g.add(ring);
-      const jambRing = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, wall, 72, 1, true), m);
-      jambRing.rotation.x = HALFPI;
-      jambRing.scale.set(rx, ry, 1);
-      jambRing.position.set(0, ry, 0);
-      jambRing.material = m;
-      jambRing.castShadow = false; jambRing.receiveShadow = true;
-      g.add(jambRing);
-      const disc = new THREE.Mesh(new THREE.CircleGeometry(1, 72), glassM);
-      disc.scale.set(rx - inch(2.6), ry - inch(2.6), 1);
-      disc.position.set(0, ry, zSash);
+      const jw = inch(0.6);            // drywall-return jamb liner
+      const fw = inch(2.2);            // sash frame face width
+      const cwid = inch(3.5);          // interior casing width
+      // jamb liner through the wall
+      const liner = ellipseRing(rx + jw, ry + jw, rx, ry, wall, m, { cast: false });
+      liner.position.set(0, ry, -wall / 2);
+      g.add(liner);
+      // sash frame near the exterior face
+      const sash = ellipseRing(rx + inch(0.1), ry + inch(0.1), rx - fw, ry - fw, inch(1.9), m);
+      sash.position.set(0, ry, -wall / 2 + inch(0.6));
+      g.add(sash);
+      // glass
+      const disc = ellipseRing(rx - fw + inch(0.25), ry - fw + inch(0.25), 0, 0, 0, glassM,
+        { cast: false });
+      disc.position.set(0, ry, -wall / 2 + inch(1.4));
       g.add(disc);
-      // flat drywall-returned casing ring on the interior
-      const face = new THREE.Mesh(new THREE.RingGeometry(1, 1.18, 72), m);
-      face.scale.set(rx, rx, 1);
+      // flat mitre-free casing ring on the interior
+      const face = ellipseRing(rx + jw + cwid, ry + jw + cwid, rx + jw, ry + jw,
+        TRIM.caseT, m);
       face.position.set(0, ry, wall / 2 - inch(0.02));
-      face.receiveShadow = true;
       g.add(face);
+      g.userData.size = [2 * (rx + jw + cwid), 2 * (ry + jw + cwid), wall];
       return g;
     }
 
@@ -1905,11 +2019,15 @@ export function makeKit(THREE, mat, tex) {
       const pw = (w - inch(6)) / cols;
       for (let c = 0; c < cols; c++) {
         const px = -w / 2 + inch(3) + pw * (c + 0.5);
+        // raised panel: the field stands PROUD of the section, so the bevel
+        // reads at any camera angle instead of vanishing head-on
+        const rz = inch(0.62);
         g.add(stickingRing(px - pw / 2 + inch(1.6), sh * r + inch(3.2),
           px + pw / 2 - inch(1.6), sh * (r + 1) - inch(3.2),
-          t, t - inch(0.5), inch(0.7), m));
-        const field = box(pw - inch(4.6), sh - inch(8.0), inch(0.3), m, { r: inch(0.08), uv: true });
-        field.position.set(px, sh * (r + 0.5), t - inch(0.5) + inch(0.15));
+          t, t + rz, inch(1.05), m));
+        const field = box(pw - inch(5.3), sh - inch(8.7), inch(0.30), m,
+          { r: inch(0.08), uv: true });
+        field.position.set(px, sh * (r + 0.5), t + rz + inch(0.12));
         g.add(field);
       }
     }
@@ -2001,8 +2119,10 @@ export function makeKit(THREE, mat, tex) {
       if (isDrawer) p.position.set(0, 0, inch(0.75));
       else {
         p.rotation.z = HALFPI;
-        p.position.set((o.hinge === 'right' ? -1 : 1) * (w / 2 - inch(1.6)),
-          h / 2 - inch(4.0), inch(0.75));
+        // door pulls sit near the opening stile: at the TOP of a base-cabinet
+        // door, at the BOTTOM of a wall-cabinet door
+        const yy = o.pullAt === 'bottom' ? -(h / 2 - inch(4.0)) : h / 2 - inch(4.0);
+        p.position.set((o.hinge === 'right' ? -1 : 1) * (w / 2 - inch(1.6)), yy, inch(0.75));
       }
       g.add(p);
     }
@@ -2097,15 +2217,15 @@ export function makeKit(THREE, mat, tex) {
     for (let i = 0; i < cols.length; i++) {
       const [cx, cw] = cols[i];
       const f = faceWithPull(cw, h - 2 * REVEAL, {
-        style, material: m, pulls,
+        style, material: m, pulls, pullAt: 'bottom',
         hinge: cols.length === 1 ? 'left' : (i === 0 ? 'left' : 'right'),
       });
       f.position.set(cx, h / 2, cd);
       g.add(f);
     }
     if (o.crown) {
-      const path = [[-w / 2, -cd], [-w / 2, 0], [w / 2, 0], [w / 2, -cd]];
-      const cm = crownMolding(path.map(([x, z]) => [x, z]), {
+      // returns down both ends and runs across the face, mitered at the corners
+      const cm = crownMolding([[-w / 2, 0], [-w / 2, d], [w / 2, d], [w / 2, 0]], {
         profile: 'cove', height: inch(2.6), projection: inch(2.2), material: m, flip: true,
       });
       cm.position.y = h;
@@ -2176,34 +2296,32 @@ export function makeKit(THREE, mat, tex) {
     g.add(body);
 
     // applied panels on all four faces
+    // applied recessed panels on all four faces: a real perforated skin plus a
+    // bevelled sticking, so each panel casts its own shadow line
     const np = o.panels === undefined ? Math.max(2, Math.round(w / 2.2)) : o.panels;
     const stile = inch(3.2);
-    const addPanels = (len, count, rotY, off) => {
-      const cols = frontRun(len, count, inch(0.02));
-      for (const [cx, cw] of cols) {
-        const p = new THREE.Group();
-        const inner = box(cw - 2 * stile, h - toe - 2 * stile, inch(0.55), m, { r: inch(0.05), uv: true });
-        inner.position.z = inch(0.28);
-        p.add(inner);
-        p.add(stickingRing(-(cw / 2 - stile) - inch(0.9), -(h - toe) / 2 + stile - inch(0.9),
-          (cw / 2 - stile) + inch(0.9), (h - toe) / 2 - stile + inch(0.9),
-          inch(0.62), inch(0.06), inch(0.7), m));
-        p.position.set(cx, 0, 0);
-        const holder = new THREE.Group();
-        holder.add(p);
-        holder.rotation.y = rotY;
-        holder.position.set(
-          rotY === 0 || rotY === Math.PI ? 0 : (rotY > 0 ? off : -off),
-          toe + (h - toe) / 2,
-          rotY === 0 ? off : rotY === Math.PI ? -off : 0
-        );
-        g.add(holder);
+    const skinT = inch(0.62);
+    const faceH = h - toe;
+    const addFace = (len, count, rotY, off) => {
+      const cols = frontRun(len, count, inch(0.04));
+      const rects = cols.map(([cx, cw]) => [
+        cx - cw / 2 + stile, -faceH / 2 + stile, cx + cw / 2 - stile, faceH / 2 - stile,
+      ]);
+      const holder = new THREE.Group();
+      holder.rotation.y = rotY;
+      const sn = Math.sin(rotY), cs2 = Math.cos(rotY);
+      holder.position.set(off * sn, toe + faceH / 2, off * cs2);
+      const skin = plateWithHoles(len, faceH, rects, skinT, m, { bevel: inch(0.06) });
+      holder.add(skin);
+      for (const [xa, ya, xb, yb] of rects) {
+        holder.add(stickingRing(xa, ya, xb, yb, skinT, inch(0.02), inch(0.62), m));
       }
+      g.add(holder);
     };
-    addPanels(w, np, 0, d / 2);
-    addPanels(w, np, Math.PI, d / 2);
-    addPanels(d, Math.max(1, Math.round(d / 2.2)), HALFPI, w / 2);
-    addPanels(d, Math.max(1, Math.round(d / 2.2)), -HALFPI, w / 2);
+    addFace(w, np, 0, d / 2);
+    addFace(w, np, Math.PI, d / 2);
+    addFace(d, Math.max(1, Math.round(d / 2.2)), HALFPI, w / 2);
+    addFace(d, Math.max(1, Math.round(d / 2.2)), -HALFPI, w / 2);
 
     if (o.counter !== false) {
       const side = o.seatingSide === '-z' ? -1 : 1;
@@ -2521,13 +2639,13 @@ export function makeKit(THREE, mat, tex) {
     g.add(boxAt(-w / 2, 0, 0, w, CAB.toeH, d - CAB.toeD, P.appliancePanel, { r: inch(0.04) }));
     g.add(boxAt(-w / 2, CAB.toeH, 0, w, h - CAB.toeH, d - inch(0.8), st,
       { r: inch(0.07), seg: 2, uv: true }));
-    const doorH = h - CAB.toeH - inch(2.2);
-    const door = boxAt(-w / 2, CAB.toeH, d - inch(0.9), w, doorH, inch(0.9), st,
-      { r: inch(0.08), seg: 2, uv: true });
+    const doorH = h - CAB.toeH - inch(2.6);
+    const door = boxAt(-w / 2 + REVEAL, CAB.toeH + REVEAL, d - inch(0.9),
+      w - 2 * REVEAL, doorH, inch(0.9), st, { r: inch(0.08), seg: 2, uv: true });
     g.add(door);
     // recessed pocket handle across the top of the door
-    const pocket = boxAt(-w / 2 + inch(0.6), h - inch(3.4), d - inch(1.5),
-      w - inch(1.2), inch(1.5), inch(0.7), P.appliancePanel, { r: inch(0.12) });
+    const pocket = boxAt(-w / 2 + inch(0.6), h - inch(3.6), d - inch(1.9),
+      w - inch(1.2), inch(1.7), inch(1.1), P.appliancePanel, { r: inch(0.12) });
     g.add(pocket);
     const bar = box(w - inch(2.0), inch(0.6), inch(0.6), st, { r: inch(0.25), seg: 2 });
     bar.position.set(0, h - inch(2.7), d - inch(0.55));
@@ -2696,8 +2814,15 @@ export function makeKit(THREE, mat, tex) {
     g.add(bez);
     const rim = cyl(dr + inch(1.0), dr + inch(1.0), inch(1.3), body, 48);
     rim.rotation.x = HALFPI;
-    rim.position.set(0, ped + (h - ped) * 0.46, d - inch(1.7));
+    rim.position.set(0, ped + (h - ped) * 0.46, d - inch(1.9));
     g.add(rim);
+    // the drum you can actually see through the glass
+    const drum = cyl(dr - inch(0.4), dr - inch(0.4), inch(9), local('washDrum', null, {
+      color: 0x2b2f33, roughness: 0.35, metalness: 0.6, envMapIntensity: 0.7,
+    }), 40);
+    drum.rotation.x = HALFPI;
+    drum.position.set(0, ped + (h - ped) * 0.46, d - inch(6.2));
+    g.add(drum);
     const gl = new THREE.Mesh(new THREE.SphereGeometry(dr, 40, 24, 0, TAU, 0, Math.PI * 0.36),
       kind === 'washer' ? P.applianceGlass : P.glass);
     gl.rotation.x = -HALFPI;
@@ -2724,12 +2849,9 @@ export function makeKit(THREE, mat, tex) {
     const h = o.h === undefined ? ft(2, 10) : o.h;
     const g = G('bottom centre of the sink back, on the floor', [w, h, d]);
     const m = o.material || P.china;
-    const basin = boxAt(-w / 2, h - inch(14), 0, w, inch(14), d, m, { r: inch(0.7), seg: 3 });
-    g.add(basin);
-    const well = boxAt(-w / 2 + inch(1.6), h - inch(12.5), inch(1.6), w - inch(3.2), inch(12.5),
-      d - inch(3.2), m, { r: inch(0.6), seg: 3 });
-    well.scale.y = 0.99;
-    g.add(well);
+    const bowl = basin(w, d, inch(13), m, { wall: inch(1.1), r: inch(0.7) });
+    bowl.position.set(0, h, d / 2);
+    g.add(bowl);
     for (const sx of [-1, 1]) for (const sz of [0.2, 0.8]) {
       const leg = box(inch(1.4), h - inch(14), inch(1.4), P.blackMetal, { r: inch(0.1) });
       leg.position.set(sx * (w / 2 - inch(1.6)), (h - inch(14)) / 2, d * sz);
@@ -2842,6 +2964,68 @@ export function makeKit(THREE, mat, tex) {
   }
 
   /**
+   * The inside surfaces of an open-top basin: four inward-facing walls and a
+   * floor, so the bowl is a real cavity rather than a dark box floating in a
+   * bright one.
+   * @anchor rim plane centre (y = 0); the cavity is below.
+   */
+  function basinCavity(w, d, depth, material, r = inch(1.0)) {
+    const b = new Builder();
+    const hx = w / 2, hz = d / 2, y0 = -depth;
+    const U = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    b.quad([-hx, y0, hz], [hx, y0, hz], [hx, y0, -hz], [-hx, y0, -hz], [0, 1, 0], U);
+    b.quad([hx, y0, hz], [hx, 0, hz], [hx, 0, -hz], [hx, y0, -hz], [-1, 0, 0], U);
+    b.quad([-hx, y0, -hz], [-hx, 0, -hz], [-hx, 0, hz], [-hx, y0, hz], [1, 0, 0], U);
+    b.quad([-hx, y0, hz], [-hx, 0, hz], [hx, 0, hz], [hx, y0, hz], [0, 0, -1], U);
+    b.quad([hx, y0, -hz], [hx, 0, -hz], [-hx, 0, -hz], [-hx, y0, -hz], [0, 0, 1], U);
+    void r;
+    const m = new THREE.Mesh(b.geometry(THREE), material);
+    m.castShadow = false; m.receiveShadow = true;
+    return m;
+  }
+
+  /**
+   * Interior surfaces of a box with its +Z face missing — a firebox, a niche,
+   * an oven cavity.  Normals face into the void so you can see the back and
+   * side walls through the opening.
+   * @anchor centre of the cavity volume.
+   */
+  function cavityBox(w, h, d, material) {
+    const b = new Builder();
+    const hx = w / 2, hy = h / 2, hz = d / 2;
+    const U = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    b.quad([-hx, -hy, -hz], [hx, -hy, -hz], [hx, hy, -hz], [-hx, hy, -hz], [0, 0, 1], U);
+    b.quad([hx, -hy, -hz], [hx, -hy, hz], [hx, hy, hz], [hx, hy, -hz], [-1, 0, 0], U);
+    b.quad([-hx, -hy, hz], [-hx, -hy, -hz], [-hx, hy, -hz], [-hx, hy, hz], [1, 0, 0], U);
+    b.quad([-hx, -hy, -hz], [-hx, -hy, hz], [hx, -hy, hz], [hx, -hy, -hz], [0, 1, 0], U);
+    b.quad([-hx, hy, hz], [-hx, hy, -hz], [hx, hy, -hz], [hx, hy, hz], [0, -1, 0], U);
+    const m = new THREE.Mesh(b.geometry(THREE), material);
+    m.castShadow = false; m.receiveShadow = true;
+    return m;
+  }
+
+  /** Outer shell + rim + cavity + drain: the body of any undermount basin. */
+  function basin(w, d, depth, material, o = {}) {
+    const g = new THREE.Group();
+    const wt = o.wall === undefined ? inch(0.55) : o.wall;
+    const r = o.r === undefined ? inch(1.1) : o.r;
+    const shell = box(w, depth, d, material, { r, seg: 3 });
+    shell.position.y = -depth / 2 - inch(0.30);
+    g.add(shell);
+    const rim = plateWithHoles(w + inch(0.5), d + inch(0.5),
+      [[-(w / 2 - wt), -(d / 2 - wt), w / 2 - wt, d / 2 - wt]],
+      inch(0.30), material, { bevel: inch(0.05) });
+    rim.rotation.x = -HALFPI;
+    rim.position.y = 0;
+    g.add(rim);
+    g.add(basinCavity(w - 2 * wt, d - 2 * wt, depth - inch(0.4), material));
+    const drain = cyl(inch(1.75), inch(1.75), inch(0.22), o.drainMaterial || P.chrome, 24);
+    drain.position.y = -depth + inch(0.5);
+    g.add(drain);
+    return g;
+  }
+
+  /**
    * Undermount sink: bowls hung below the counter with a small reveal.
    * @anchor centre of the sink cut-out at the COUNTER TOP surface (y = 0);
    *         the bowls hang into negative y.
@@ -2856,16 +3040,9 @@ export function makeKit(THREE, mat, tex) {
     const bw = (w - (bowls - 1) * inch(0.8)) / bowls;
     for (let i = 0; i < bowls; i++) {
       const cx = -w / 2 + bw / 2 + i * (bw + inch(0.8));
-      const shell = box(bw, depth, d, m, { r: inch(1.1), seg: 3 });
-      shell.position.set(cx, -depth / 2 - inch(0.1), 0);
-      g.add(shell);
-      const inner = box(bw - inch(0.35), depth, d - inch(0.35), P.appliancePanel,
-        { r: inch(0.95), seg: 3, cast: false });
-      inner.position.set(cx, -depth / 2 + inch(0.55), 0);
-      g.add(inner);
-      const drain = cyl(inch(1.8), inch(1.8), inch(0.25), m, 24);
-      drain.position.set(cx, -depth + inch(0.4), 0);
-      g.add(drain);
+      const b = basin(bw, d, depth, m, { wall: inch(0.5) });
+      b.position.x = cx;
+      g.add(b);
     }
     return g;
   }
@@ -2881,18 +3058,11 @@ export function makeKit(THREE, mat, tex) {
     const depth = o.depth === undefined ? inch(10) : o.depth;
     const m = o.material || P.china;
     const g = G('centre of the sink cut-out at the counter top surface', [w, depth, d]);
-    const shell = box(w, depth + inch(1.5), d, m, { r: inch(0.9), seg: 3 });
-    shell.position.set(0, -(depth + inch(1.5)) / 2 + inch(0.4), 0);
-    g.add(shell);
-    const well = box(w - inch(2.0), depth, d - inch(2.0), m, { r: inch(0.8), seg: 3, cast: false });
-    well.position.set(0, -depth / 2 + inch(1.0), 0);
-    g.add(well);
-    const apron = box(w + inch(0.6), depth + inch(2.2), inch(1.2), m, { r: inch(0.35), seg: 3 });
-    apron.position.set(0, -(depth + inch(2.2)) / 2 + inch(0.4), d / 2 + inch(0.4));
+    g.add(basin(w, d, depth, m, { wall: inch(1.0), r: inch(0.8) }));
+    // the apron front hangs proud of the cabinet face
+    const apron = box(w + inch(0.8), depth + inch(2.0), inch(1.4), m, { r: inch(0.35), seg: 3 });
+    apron.position.set(0, -(depth + inch(2.0)) / 2 + inch(0.5), d / 2 + inch(0.55));
     g.add(apron);
-    const drain = cyl(inch(1.8), inch(1.8), inch(0.25), P.chrome, 24);
-    drain.position.set(0, -depth + inch(1.2), 0);
-    g.add(drain);
     return g;
   }
 
@@ -2964,12 +3134,9 @@ export function makeKit(THREE, mat, tex) {
     const ped = taperBox(inch(9), inch(9), inch(7), inch(8), h - inch(7), m);
     ped.position.set(0, 0, d / 2);
     g.add(ped);
-    const basin = box(w, inch(7), d, m, { r: inch(1.6), seg: 4 });
-    basin.position.set(0, h - inch(3.5), d / 2);
-    g.add(basin);
-    const well = box(w - inch(4.5), inch(6.4), d - inch(4.5), m, { r: inch(1.4), seg: 4, cast: false });
-    well.position.set(0, h - inch(2.4), d / 2 + inch(0.6));
-    g.add(well);
+    const bowl = basin(w, d, inch(6.5), m, { wall: inch(2.2), r: inch(1.6) });
+    bowl.position.set(0, h, d / 2);
+    g.add(bowl);
     const f = faucet({ style: 'gooseneck', finish: o.finish || 'chrome', height: inch(8), reach: inch(5) });
     f.position.set(0, h, inch(2.4));
     g.add(f);
@@ -2987,26 +3154,30 @@ export function makeKit(THREE, mat, tex) {
     const deckH = o.deckH === undefined ? inch(21) : o.deckH;
     const tile = o.tile || P.tile;
     const g = G('bottom centre of the surround footprint, on the floor', [w, deckH, l]);
-    // tiled deck box
-    const body = box(w, deckH - inch(1.4), l, tile, { r: inch(0.1), uv: true });
-    body.position.y = (deckH - inch(1.4)) / 2;
-    g.add(body);
-    const cap = box(w + inch(1.2), inch(1.4), l + inch(1.2), o.capMaterial || P.quartz,
-      { r: inch(0.09), seg: 2, uv: true });
-    cap.position.y = deckH - inch(0.7);
-    g.add(cap);
-    // tub well
-    const tw = o.tubW === undefined ? w - ft(1, 2) : o.tubW;
-    const tl = o.tubL === undefined ? l - ft(1, 2) : o.tubL;
+    const tw = o.tubW === undefined ? w - ft(1, 4) : o.tubW;
+    const tl = o.tubL === undefined ? l - ft(1, 4) : o.tubL;
     const depth = o.depth === undefined ? inch(17) : o.depth;
-    const well = box(tw, depth * 2, tl, P.acrylic, { r: inch(3.5), seg: 5 });
-    well.position.y = deckH - inch(1.4) - depth + depth;
-    well.position.y = deckH + depth - inch(1.2);
-    g.add(well);
-    const inner = box(tw - inch(2.2), depth * 2, tl - inch(2.2), P.acrylic,
-      { r: inch(3.0), seg: 5, cast: false });
-    inner.position.y = deckH + depth - inch(0.2);
-    g.add(inner);
+    const capT = inch(1.4);
+    // tiled deck built as a ring of four walls so the tub is a real void
+    const sideW = (w - tw) / 2, endL = (l - tl) / 2;
+    for (const s of [-1, 1]) {
+      const b1 = box(w, deckH - capT, endL, tile, { r: inch(0.1), uv: true });
+      b1.position.set(0, (deckH - capT) / 2, s * (l / 2 - endL / 2));
+      g.add(b1);
+      const b2 = box(sideW, deckH - capT, tl, tile, { r: inch(0.1), uv: true });
+      b2.position.set(s * (w / 2 - sideW / 2), (deckH - capT) / 2, 0);
+      g.add(b2);
+    }
+    // quartz deck cap with the tub opening cut through it
+    const cap = plateWithHoles(w + inch(1.2), l + inch(1.2),
+      [[-tw / 2, -tl / 2, tw / 2, tl / 2]], capT, o.capMaterial || P.quartz,
+      { bevel: inch(0.07) });
+    cap.rotation.x = -HALFPI;
+    cap.position.y = deckH;
+    g.add(cap);
+    const cav = basinCavity(tw, tl, depth, P.acrylic);
+    cav.position.y = deckH - capT;
+    g.add(cav);
     // jets
     const jets = o.jets === undefined ? 6 : o.jets;
     for (let i = 0; i < jets; i++) {
@@ -3020,7 +3191,7 @@ export function makeKit(THREE, mat, tex) {
       g.add(j);
     }
     const drain = cyl(inch(1.1), inch(1.1), inch(0.3), P.chrome, 20);
-    drain.position.set(0, deckH - depth + inch(0.2), 0);
+    drain.position.set(0, deckH - capT - depth + inch(0.2), 0);
     g.add(drain);
     const f = faucet({ style: 'gooseneck', finish: o.finish || 'chrome', height: inch(9), reach: inch(7) });
     f.position.set(0, deckH, -l / 2 + inch(5));
@@ -3039,14 +3210,28 @@ export function makeKit(THREE, mat, tex) {
     const h = o.h === undefined ? inch(20) : o.h;
     const m = o.material || P.acrylic;
     const g = G('bottom centre of the tub back, on the floor', [w, h, d]);
-    const shell = box(w, h, d, m, { r: inch(1.6), seg: 3 });
-    shell.position.set(0, h / 2, d / 2);
-    g.add(shell);
-    const well = box(w - inch(6), h, d - inch(6), m, { r: inch(4.0), seg: 5, cast: false });
-    well.position.set(0, h + inch(1.6), d / 2);
-    g.add(well);
+    const tw = w - inch(7), td = d - inch(7);
+    const rimT = inch(2.2);
+    // apron + deck as a ring so the bathing well is a genuine cavity
+    const sideW = (w - tw) / 2, endD = (d - td) / 2;
+    for (const s of [-1, 1]) {
+      const b1 = box(w, h - rimT, endD, m, { r: inch(1.2), seg: 3 });
+      b1.position.set(0, (h - rimT) / 2, d / 2 + s * (d / 2 - endD / 2));
+      g.add(b1);
+      const b2 = box(sideW, h - rimT, td, m, { r: inch(1.2), seg: 3 });
+      b2.position.set(s * (w / 2 - sideW / 2), (h - rimT) / 2, d / 2);
+      g.add(b2);
+    }
+    const rim = plateWithHoles(w, d, [[-tw / 2, -td / 2, tw / 2, td / 2]], rimT, m,
+      { bevel: inch(0.5) });
+    rim.rotation.x = -HALFPI;
+    rim.position.set(0, h, d / 2);
+    g.add(rim);
+    const cav = basinCavity(tw, td, h - rimT - inch(1.0), m);
+    cav.position.set(0, h - rimT, d / 2);
+    g.add(cav);
     const drain = cyl(inch(1.1), inch(1.1), inch(0.3), P.chrome, 20);
-    drain.position.set(-w / 2 + inch(5), inch(3.4), d / 2);
+    drain.position.set(-w / 2 + inch(6), inch(2.0), d / 2);
     g.add(drain);
     const spout = cyl(inch(0.9), inch(0.9), inch(5.5), P.chrome, 16);
     spout.rotation.x = HALFPI;
@@ -3266,6 +3451,10 @@ export function makeKit(THREE, mat, tex) {
     lens.rotation.x = HALFPI;
     lens.position.y = inch(3.1);
     g.add(lens);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(d / 2 - inch(0.85), d / 2 - inch(0.85),
+      inch(1.2), 36), o.can || local('canBody', null, { color: 0xdedcd8, roughness: 0.6 }));
+    cap.position.y = inch(3.7);
+    g.add(cap);
     return g;
   }
 
@@ -3472,15 +3661,20 @@ export function makeKit(THREE, mat, tex) {
     can.position.y = -inch(0.5);
     g.add(can);
     const drum = new THREE.Mesh(
-      new THREE.SphereGeometry(d / 2, 36, 24, 0, TAU, Math.PI * 0.34, Math.PI * 0.66), P.bulb);
-    drum.scale.y = (h / (d / 2)) * 0.9;
-    drum.position.y = -inch(1.0);
+      new THREE.SphereGeometry(d / 2, 40, 20, 0, TAU, Math.PI * 0.5, Math.PI * 0.5), P.bulb);
+    drum.scale.y = (h / (d / 2)) * 1.15;
+    drum.position.y = -inch(0.9);
     drum.castShadow = false;
     g.add(drum);
     const ring = torus(d / 2 * 0.99, inch(0.22), fin, 40, 8);
     ring.rotation.x = HALFPI;
     ring.position.y = -inch(1.0);
     g.add(ring);
+    const top = new THREE.Mesh(new THREE.CircleGeometry(d / 2 * 0.99, 40), fin);
+    top.rotation.x = HALFPI;
+    top.position.y = -inch(0.88);
+    top.receiveShadow = true;
+    g.add(top);
     return g;
   }
 
@@ -3574,28 +3768,36 @@ export function makeKit(THREE, mat, tex) {
       g.add(tread);
     }
     if (o.skirt !== false) {
+      // A real skirt board: its TOP edge is cut to the staircase profile and
+      // its bottom edge is a straight rake that dies into the floor.  A plain
+      // raking plank cannot cover the step nosings and leaves them floating.
+      const th = inch(0.75);
+      const drop = inch(9.5);
+      const totalRun = n * run;
+      const shape = new THREE.Shape();
+      shape.moveTo(0, 0);
+      for (let i = 0; i < n; i++) {
+        shape.lineTo(run * i, r * (i + 1));
+        shape.lineTo(run * (i + 1), r * (i + 1));
+      }
+      shape.lineTo(totalRun, rise - drop);
+      const zFloor = Math.min(totalRun * 0.9, (drop * totalRun) / Math.max(rise, 1e-6));
+      shape.lineTo(zFloor, 0);
+      shape.closePath();
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: th, bevelEnabled: true, bevelThickness: inch(0.05), bevelSize: inch(0.05),
+        bevelSegments: 1, steps: 1, curveSegments: 4,
+      });
+      const sf = uvs(rm);
+      const uvA = geo.attributes.uv;
+      for (let i = 0; i < uvA.count; i++) uvA.setXY(i, uvA.getX(i) / sf[0], uvA.getY(i) / sf[1]);
+      uvA.needsUpdate = true;
+      geo.computeVertexNormals();
       for (const s of [-1, 1]) {
-        const b = new Builder();
-        const th = inch(0.75), top = inch(4.0);
-        const pts = [];
-        for (let i = 0; i <= n; i++) {
-          pts.push([run * i, r * i]);
-          pts.push([run * i, r * (i + 1)]);
-        }
-        const outer = pts.map(([z, y]) => [z, y + top]);
-        for (let i = 0; i < pts.length - 1; i++) {
-          const A = [s * (w / 2), pts[i][1], pts[i][0]];
-          const B2 = [s * (w / 2), pts[i + 1][1], pts[i + 1][0]];
-          const C = [s * (w / 2), outer[i + 1][1], outer[i + 1][0]];
-          const D = [s * (w / 2), outer[i][1], outer[i][0]];
-          void A; void B2; void C; void D;
-        }
-        void b;
-        // a simple raking board is enough at photo scale
-        const len = Math.hypot(n * run, rise);
-        const sk = box(th, inch(10), len, rm, { r: inch(0.06), uv: true });
-        sk.position.set(s * (w / 2 + th / 2), rise / 2 - inch(1.5), (n * run) / 2);
-        sk.rotation.x = -Math.atan2(rise, n * run);
+        const sk = new THREE.Mesh(geo, rm);
+        sk.castShadow = true; sk.receiveShadow = true;
+        sk.rotation.y = -HALFPI;          // shape X -> world +Z, extrude -> -X
+        sk.position.set(s < 0 ? -w / 2 : w / 2 + th, 0, 0);
         g.add(sk);
       }
     }
@@ -3734,13 +3936,13 @@ export function makeKit(THREE, mat, tex) {
     const g = G('bottom centre of the post, on the floor', [inch(6), h, inch(6)]);
     const pts = [];
     const add = (r, y) => pts.push(new THREE.Vector2(inch(r), y * h));
-    add(2.9, 0.000); add(2.9, 0.030); add(2.5, 0.045);
-    add(2.6, 0.070); add(1.85, 0.105);
-    add(1.75, 0.150); add(2.15, 0.190); add(1.80, 0.225);
-    add(1.72, 0.760); add(2.10, 0.800); add(1.80, 0.840);
-    add(1.85, 0.905); add(2.55, 0.945); add(2.5, 0.965);
-    add(2.9, 0.975); add(2.9, 1.000);
-    const lathe = new THREE.Mesh(new THREE.LatheGeometry(pts, 28), m);
+    add(0.0, 0.000); add(3.6, 0.000); add(3.6, 0.055);
+    add(3.1, 0.075); add(3.25, 0.100); add(2.55, 0.130);
+    add(2.45, 0.165); add(3.05, 0.200); add(2.60, 0.235);
+    add(2.42, 0.780); add(3.05, 0.815); add(2.60, 0.850);
+    add(2.55, 0.895); add(3.25, 0.925); add(3.10, 0.948);
+    add(3.6, 0.960); add(3.6, 1.000); add(0.0, 1.000);
+    const lathe = new THREE.Mesh(new THREE.LatheGeometry(pts, 32), m);
     lathe.castShadow = true; lathe.receiveShadow = true;
     g.add(lathe);
     return g;
@@ -3821,41 +4023,55 @@ export function makeKit(THREE, mat, tex) {
       g.add(hs);
     }
     // firebox
-    const fb = boxAt(-fbW / 2 + inch(1.5), fbY + inch(1.5), -inch(1.0),
-      fbW - inch(3), fbH - inch(3), d - inch(2.5), P.appliancePanel, { r: inch(0.05), cast: false });
+    const fbD = d - inch(3.0);
+    const fb = cavityBox(fbW - inch(3), fbH - inch(3), fbD, local('fireboxLiner', null, {
+      color: 0x14151a, roughness: 0.62, metalness: 0.25, envMapIntensity: 0.3,
+    }));
+    fb.position.set(0, fbY + fbH / 2, fbD / 2 - inch(0.5));
     g.add(fb);
     const glass = box(fbW - inch(3.4), fbH - inch(3.4), inch(0.35),
       local('fireGlass', null, {
-        color: 0x14161a, roughness: 0.04, metalness: 0.2, transmission: 0.55,
-        thickness: 0.02, transparent: true, envMapIntensity: 1.4, side: THREE.DoubleSide,
+        // deliberately NOT a transmission material: three's transmission pass
+        // does not capture transparent objects, so the flames behind the glass
+        // would vanish.  Plain alpha blending keeps the fire visible.
+        color: 0x1a1c20, roughness: 0.03, metalness: 0.0, transparent: true,
+        opacity: 0.30, envMapIntensity: 1.6, side: THREE.DoubleSide,
+        clearcoat: 1.0, clearcoatRoughness: 0.02, depthWrite: false,
       }), { r: inch(0.04), cast: false });
     glass.position.set(0, fbY + fbH / 2, d - inch(1.6));
     g.add(glass);
     // log set + ember bed
-    const emb = boxAt(-fbW / 2 + inch(3), fbY + inch(2), inch(1.0), fbW - inch(6), inch(1.2),
-      d - inch(6), local('emberBed', null, {
-        color: 0x241a14, roughness: 0.9, emissive: 0xff5a12, emissiveIntensity: 0.55,
+    const emb = boxAt(-fbW / 2 + inch(4), fbY + inch(2.0), inch(1.5), fbW - inch(8), inch(1.0),
+      fbD - inch(6), local('emberBed', null, {
+        color: 0x1c1410, roughness: 0.94, emissive: 0xff4a08, emissiveIntensity: 0.22,
       }), { r: inch(0.1) });
     g.add(emb);
-    const logM = local('gasLog', null, { color: 0x4a3b2e, roughness: 0.85 });
+    const logM = local('gasLog', null, {
+      color: 0x453629, roughness: 0.88, emissive: 0x40140a, emissiveIntensity: 0.35,
+    });
     for (let i = 0; i < 4; i++) {
-      const lg = cyl(inch(1.7), inch(1.5), fbW - inch(9), logM, 12);
+      const lg = cyl(inch(1.8), inch(1.6), fbW - inch(9), logM, 12);
       lg.rotation.z = HALFPI;
       lg.rotation.y = deg(-8 + i * 5);
-      lg.position.set(0, fbY + inch(3.6) + (i % 2) * inch(2.6), d / 2 - inch(1) + (i - 1.5) * inch(2.2));
+      lg.position.set(0, fbY + inch(4.2) + (i % 2) * inch(2.6),
+        fbD * 0.45 + (i - 1.5) * inch(2.4));
       g.add(lg);
     }
     // emissive flame plane
     const flameM = local('flame', null, {
-      color: 0xffb04a, emissive: 0xff8c1a, emissiveIntensity: 3.2, roughness: 0.9,
-      transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false,
+      color: 0x000000, emissive: 0xff8a1e, emissiveIntensity: 2.4, roughness: 1.0,
+      transparent: true, opacity: 0.82, side: THREE.DoubleSide, depthWrite: false,
+      alphaMap: flameAlpha(), toneMapped: true,
     });
-    const fl = new THREE.Mesh(new THREE.PlaneGeometry(fbW - inch(10), inch(13)), flameM);
-    fl.position.set(0, fbY + inch(9), d / 2 + inch(0.5));
-    g.add(fl);
-    const fl2 = fl.clone();
+    for (let i = 0; i < 3; i++) {
+      const fw2 = (fbW - inch(11)) * (1 - i * 0.22);
+      const fl = new THREE.Mesh(new THREE.PlaneGeometry(fw2, inch(11) - i * inch(1.6)), flameM);
+      fl.position.set(0, fbY + inch(9) - i * inch(0.8), fbD * 0.30 + i * inch(2.4));
+      g.add(fl);
+    }
+    const fl2 = new THREE.Mesh(new THREE.PlaneGeometry((fbW - inch(11)) * 0.5, inch(10)), flameM);
     fl2.rotation.y = HALFPI;
-    fl2.scale.x = 0.55;
+    fl2.position.set(0, fbY + inch(9), fbD * 0.45);
     g.add(fl2);
 
     if (o.mantel !== false) {
@@ -4062,7 +4278,11 @@ export function makeKit(THREE, mat, tex) {
     const back = cushion(w - inch(3), h - seatY, backT, m);
     back.position.set(0, seatY + (h - seatY) / 2, -d / 2 + backT / 2 + inch(1));
     g.add(back);
+    const arms = o.arms === undefined ? 'both' : o.arms;
     for (const s of [-1, 1]) {
+      if (arms === 'none') break;
+      if (arms === 'left' && s > 0) continue;
+      if (arms === 'right' && s < 0) continue;
       const arm = cushion(inch(7), h - seatY - inch(4), d - inch(2), m);
       arm.position.set(s * (w / 2 - inch(3.5)), seatY + (h - seatY - inch(4)) / 2, 0);
       g.add(arm);
@@ -4098,11 +4318,17 @@ export function makeKit(THREE, mat, tex) {
     const side = o.side === 'left' ? -1 : 1;
     const g = G('bottom centre of the main run footprint, seat facing +Z',
       [w, ft(2, 8), d + chaise]);
-    const main = sofa({ w, d, material: o.material, h: o.h });
+    const main = sofa({
+      w, d, material: o.material, h: o.h, arms: side > 0 ? 'left' : 'right',
+    });
     g.add(main);
-    const ret = sofa({ w: chaise, d, material: o.material, h: o.h, seats: 2 });
+    const ret = sofa({
+      w: chaise, d, material: o.material, h: o.h, seats: 2,
+      arms: side > 0 ? 'left' : 'right',
+    });
+    // rotate so the return's seat faces inward, then butt it to the main run
     ret.rotation.y = -side * HALFPI;
-    ret.position.set(side * (w / 2 - d / 2), 0, d / 2 + chaise / 2 - d / 2);
+    ret.position.set(side * (w / 2 - d / 2), 0, d / 2 + chaise / 2 - inch(1));
     g.add(ret);
     return g;
   }
@@ -4736,9 +4962,9 @@ export function makeKit(THREE, mat, tex) {
     const h = o.h === undefined ? inch(30) : o.h;
     const m = o.material || P.woodDark;
     const g = G('bottom centre of the footprint', [w, h, L]);
-    const play = box(w - inch(9), inch(3), L, P.butcherBlock || P.whiteOak,
+    const play = box(w - inch(9), inch(3), L, mat.butcherBlock || P.whiteOak,
       { r: inch(0.1), seg: 2, uv: true });
-    play.position.y = h - inch(1.5);
+    play.position.y = h - inch(3.5);   // recessed between the raised cradles
     g.add(play);
     for (const s of [-1, 1]) {
       const cr = box(inch(4.5), inch(12), L, m, { r: inch(0.14), seg: 2, uv: true });
@@ -4767,6 +4993,8 @@ export function makeKit(THREE, mat, tex) {
     roundedBox, box, boxAt, cyl, ball, torus, taperBox, tube,
     sweepProfile, extrudeProfile, sweptMesh, stickingRing, Builder,
     PROFILE, materials: P, uvScaleFor: uvs, group: G,
+
+    plateWithHoles, ellipseRing, cavityBox, basinCavity, basin, flameAlpha,
 
     // millwork / trim
     baseboard, crownMolding, chairRail, doorCasing, windowCasing,

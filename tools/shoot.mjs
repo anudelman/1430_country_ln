@@ -42,6 +42,9 @@
  *   --stack-dir <d>     vertical|horizontal for --stack        [vertical]
  *   --gap <px>          neutral gutter between the two images  [12]
  *   --seed <n>          fix the A/B randomisation
+ *   --param k=v         extra URL parameter for app/index.html; repeatable.
+ *                       e.g. --param room=kitchen  builds only that piece;
+ *                            --param selftest=fail proves the failure path.
  *   --no-shot           leave the UI on (debugging only; not deterministic)
  *   --keep-open <ms>    hold the browser open after the last shot
  *   --json              print one JSON object instead of human lines
@@ -121,6 +124,15 @@ const CFG = {
   json: has('json'),
   list: has('list'),
 };
+
+/** Repeatable `--param k=v`, appended verbatim to the app URL. */
+const EXTRA_PARAMS = [];
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i] === '--param' && argv[i + 1]) {
+    const eq = argv[i + 1].indexOf('=');
+    if (eq > 0) EXTRA_PARAMS.push([argv[i + 1].slice(0, eq), argv[i + 1].slice(eq + 1)]);
+  }
+}
 
 const LOG = [];
 function say(...a) {
@@ -258,6 +270,7 @@ function pageUrl(base, id, size) {
   q.set('w', String(size.width));
   q.set('h', String(size.height));
   if (CFG.exposure !== null) q.set('exposure', String(CFG.exposure));
+  for (const [k, v] of EXTRA_PARAMS) q.set(k, v);
   return `${base}/app/index.html?${q.toString()}`;
 }
 
@@ -299,6 +312,12 @@ async function reportWarnings(page) {
   for (const w of warns) say('   [app warn] ' + w);
 }
 
+/** Repo-relative when it is inside the repo, absolute when it is not. */
+function show(file) {
+  const rel = path.relative(ROOT, file);
+  return rel.startsWith('..') ? file : rel;
+}
+
 function writeDataUrlPng(dataUrl, file) {
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/png;base64,')) {
     throw new Error('capture did not return a PNG data URL');
@@ -327,6 +346,11 @@ async function makeComposePage(browser) {
 /**
  * Draw two images at IDENTICAL size into one PNG. No text, no borders, no
  * letters — a blind comparison must give the critic nothing but the pixels.
+ *
+ * Every listing photo carries a grey rounded "N of 50" badge in the top-right
+ * corner (PHOTOGRAPHY §1.1). Left alone it decides the test in one glance, so
+ * the SAME rectangle is painted out of BOTH cells with a colour sampled from
+ * each image's own neighbouring pixels — symmetric, and no new tell.
  */
 async function composePair(page, aUrl, bUrl, { direction, gap }) {
   return page.evaluate(
@@ -344,21 +368,38 @@ async function composePair(page, aUrl, bUrl, { direction, gap }) {
       const cw = Math.min(ia.naturalWidth, ib.naturalWidth);
       const ch = Math.min(ia.naturalHeight, ib.naturalHeight);
 
+      // Badge box in cell coordinates, with margin: x 1440..1526 / y 0..34
+      // on a 1526x1014 frame, expressed as fractions so any crop works.
+      const bx = Math.floor(cw * 0.9345);
+      const by = 0;
+      const bw = cw - bx;
+      const bh = Math.max(8, Math.ceil(ch * 0.0385));
+
       const horiz = direction !== 'vertical';
       const c = document.getElementById('k');
       c.width = horiz ? cw * 2 + gap : cw;
       c.height = horiz ? ch : ch * 2 + gap;
 
-      const g = c.getContext('2d');
+      const g = c.getContext('2d', { willReadFrequently: true });
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
       g.fillStyle = '#808080';
       g.fillRect(0, 0, c.width, c.height);
-      g.drawImage(ia, 0, 0, cw, ch);
-      if (horiz) g.drawImage(ib, cw + gap, 0, cw, ch);
-      else g.drawImage(ib, 0, ch + gap, cw, ch);
 
-      return { url: c.toDataURL('image/png'), cell: [cw, ch], size: [c.width, c.height] };
+      const cells = horiz ? [[0, 0], [cw + gap, 0]] : [[0, 0], [0, ch + gap]];
+      const imgs = [ia, ib];
+      for (let i = 0; i < 2; i++) {
+        const [ox, oy] = cells[i];
+        g.drawImage(imgs[i], ox, oy, cw, ch);
+        // Sample just under the badge, inside this image, and flood the box.
+        const sx = Math.max(0, Math.min(c.width - 1, ox + bx - 8));
+        const sy = Math.max(0, Math.min(c.height - 1, oy + bh + 10));
+        const px = g.getImageData(sx, sy, 1, 1).data;
+        g.fillStyle = `rgb(${px[0]},${px[1]},${px[2]})`;
+        g.fillRect(ox + bx, oy + by, bw, bh);
+      }
+
+      return { url: c.toDataURL('image/png'), cell: [cw, ch], size: [c.width, c.height], badge: [bx, by, bw, bh] };
     },
     { a: aUrl, b: bUrl, direction, gap }
   );
@@ -454,7 +495,7 @@ try {
     const rec = {
       preset: id,
       room: preset.room || null,
-      out: path.relative(ROOT, outFile),
+      out: show(outFile),
       width: size.width,
       height: size.height,
       bytes,
@@ -466,7 +507,7 @@ try {
     if (CFG.sbs || CFG.stack) {
       const photoFile = path.resolve(ROOT, 'listing_photos', preset.photo || `${id}.png`);
       if (!fs.existsSync(photoFile)) {
-        sink.push(`[compare skipped] no listing photo at ${path.relative(ROOT, photoFile)}`);
+        sink.push(`[compare skipped] no listing photo at ${show(photoFile)}`);
       } else {
         if (!composePage) composePage = await makeComposePage(browser);
         const photoUrl = fileToDataUrl(photoFile);
@@ -476,7 +517,7 @@ try {
           const c = await composePair(composePage, photoUrl, renderUrl, { direction: 'horizontal', gap: CFG.gap });
           const f = path.resolve(ROOT, CFG.outdir, `sbs_${id}.png`);
           writeDataUrlPng(c.url, f);
-          rec.sbs = path.relative(ROOT, f);
+          rec.sbs = show(f);
         }
 
         if (CFG.stack) {
@@ -488,14 +529,14 @@ try {
           writeDataUrlPng(c.url, f);
           const key = {
             preset: id,
-            image: path.relative(ROOT, f),
+            image: show(f),
             direction: CFG.stackDir,
             A: renderFirst ? 'render' : 'photo',
             B: renderFirst ? 'photo' : 'render',
             APosition: CFG.stackDir === 'vertical' ? 'top' : 'left',
             BPosition: CFG.stackDir === 'vertical' ? 'bottom' : 'right',
-            render: path.relative(ROOT, outFile),
-            photo: path.relative(ROOT, photoFile),
+            render: show(outFile),
+            photo: show(photoFile),
             cell: c.cell,
             seed: rng.seed,
             created: new Date().toISOString(),
@@ -504,8 +545,8 @@ try {
           const kf = path.resolve(ROOT, CFG.outdir, `stack_${id}.json`);
           await fsp.mkdir(path.dirname(kf), { recursive: true });
           await fsp.writeFile(kf, JSON.stringify(key, null, 2) + '\n');
-          rec.stack = path.relative(ROOT, f);
-          rec.stackKey = path.relative(ROOT, kf);
+          rec.stack = show(f);
+          rec.stackKey = show(kf);
         }
       }
     }
