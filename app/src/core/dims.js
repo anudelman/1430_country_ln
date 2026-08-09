@@ -88,7 +88,9 @@ import {
 
 export const LEVELS = { basement: -9.0, first: 0.0, second: 9.5 };
 
-export const CEIL = { basement: 7.75, first: 8.5, second: 8.0 };
+// basement 7.49 is MEASURED from basement_view_*.png (docs/PHOTOGRAPHY.md), not assumed.
+// second 8.00 was measured and confirmed exactly.
+export const CEIL = { basement: 7.49, first: 8.5, second: 8.0 };
 
 /** Absolute Y of each ceiling plane. */
 export const CEIL_Y = {
@@ -1120,10 +1122,10 @@ export const OPENINGS = [
   { wall: 'w2-bath-mid', type: 'door', center: 2.6, w: ft(2, 4), h: DH, sill: 0, swing: 'left-in', note: 'between the two hall baths' },
 
   /* ---------------- basement ----------------------------------------- */
-  { wall: 'ext-bsmt-4', type: 'window', center: 9.0, w: 3.0, h: 1.9, sill: 5.6, note: 'rec room window well' },
-  { wall: 'ext-bsmt-4', type: 'window', center: 19.0, w: 3.0, h: 1.9, sill: 5.6, note: 'rec room window well' },
-  { wall: 'ext-bsmt-4', type: 'window', center: 29.0, w: 3.0, h: 1.9, sill: 5.6, note: 'rec room window well' },
-  { wall: 'ext-bsmt-5', type: 'window', center: 26.0, w: 3.0, h: 1.9, sill: 5.6, note: 'gym window well' },
+  { wall: 'ext-bsmt-4', type: 'window', center: 9.0, w: 3.0, h: 1.9, sill: 5.45, note: 'rec room window well' },
+  { wall: 'ext-bsmt-4', type: 'window', center: 19.0, w: 3.0, h: 1.9, sill: 5.45, note: 'rec room window well' },
+  { wall: 'ext-bsmt-4', type: 'window', center: 29.0, w: 3.0, h: 1.9, sill: 5.45, note: 'rec room window well' },
+  { wall: 'ext-bsmt-5', type: 'window', center: 26.0, w: 3.0, h: 1.9, sill: 5.45, note: 'gym window well' },
   { wall: 'wb-gym-e', type: 'door', center: 16.0, w: ft(2, 8), h: DH, sill: 0, swing: 'left-in', note: 'gym' },
   { wall: 'wb-gym-e', type: 'door', center: 6.0, w: ft(2, 8), h: DH, sill: 0, swing: 'left-in', note: 'seasonal storage' },
   { wall: 'wb-utility-s', type: 'door', center: 3.0, w: ft(2, 8), h: DH, sill: 0, swing: 'right-in', note: 'utility room' },

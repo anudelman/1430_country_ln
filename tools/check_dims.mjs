@@ -172,7 +172,8 @@ function checkDatums() {
   for (const [k, v] of Object.entries(want)) {
     if (Math.abs(LEVELS[k] - v) > 1e-9) fail('datum', `LEVELS.${k} = ${LEVELS[k]}, expected ${v}`);
   }
-  const wantC = { basement: 7.75, first: 8.5, second: 8.0 };
+  // basement 7.49 is measured from the photos (docs/PHOTOGRAPHY.md), superseding the 7.75 estimate
+  const wantC = { basement: 7.49, first: 8.5, second: 8.0 };
   for (const [k, v] of Object.entries(wantC)) {
     if (Math.abs(CEIL[k] - v) > 1e-9) fail('datum', `CEIL.${k} = ${CEIL[k]}, expected ${v}`);
   }
