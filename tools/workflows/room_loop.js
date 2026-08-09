@@ -39,7 +39,8 @@ const ALL_PIECES = {
       Flanked BOTH sides by full-height sidelights fitted with WHITE PLANTATION SHUTTERS (louvers
       ~2.5", visible tilt rod). Black surround/reveal. BLUESTONE FLAGSTONE stoop and walk — irregular
       rectangular slabs, blue-gray, with tight mortar joints. Gray weathered lap siding around.
-      Rounded hedges crowd both sides. Recessed soffit light above.`,
+      Rounded hedges crowd both sides. Recessed soffit light above. A COIR "WELCOME HOME" DOORMAT
+      lies on the stoop — one of only a handful of movable objects in the entire house.`,
   },
   'exterior-rear': {
     title: 'Rear elevation', level: 'exterior', hero: 'backyard_straight_on_view_of_house',
@@ -98,7 +99,7 @@ const ALL_PIECES = {
     photos: ['kitchen_breakfast_nook.png', 'view_from_breakfast_nook_looking_out_at_backyard_patio.png'],
     brief: `Open to the kitchen and family room. RED OAK floors, CROWN MOLDING, recessed lights.
       Opens to the REAR WINDOW WALL — white sliding glass doors plus a French door out to the deck.
-      Casual dining table and chairs.`,
+      THE ROOM IS EMPTY — no table, no chairs, no staging of any kind.`,
   },
   dining: {
     title: 'Dining room', level: 'first', hero: 'dining_room', dims: `13'11" x 10'11"`,
@@ -107,20 +108,42 @@ const ALL_PIECES = {
       A THREE-PANEL CASEMENT WINDOW in the bay. A BLACK-AND-BRASS SPUTNIK GLOBE CHANDELIER (radiating
       arms ending in frosted glass globes). A RECESSED NICHE WITH SHELVING in one wall. RED OAK floors.`,
   },
-  living: {
-    title: 'Living room', level: 'first', hero: 'view_from_kitchen_of_living_room_looking_out_to_backyard',
-    dims: `18'11" x 18'2"`,
-    photos: ['view_from_kitchen_of_living_room_looking_out_to_backyard.png'],
-    brief: `Large room with a GAS FIREPLACE and a WET BAR alcove. Opens to the rear window wall —
-      floor-to-ceiling glass looking out to the backyard. RED OAK floors, CROWN MOLDING, recessed
-      lights. Seating grouped toward the fireplace.`,
-  },
+  // NOTE: the listing photo FILENAMES are swapped relative to the floor plan LABELS.
+  // Piece ids follow the PHOTO FILENAMES (matching docs/DETAILS.md and status.json):
+  //   piece `family` = the FIREPLACE room   = floor plan "LIVING ROOM"  18'11" x 18'2"
+  //   piece `living` = the REAR-WINDOW room = floor plan "FAMILY ROOM"  12'1"  x 19'8"
   family: {
-    title: 'Family room', level: 'first', hero: 'family_room_1', dims: `12'1" x 19'8"`,
+    title: 'Fireplace room (plan: LIVING ROOM)', level: 'first', hero: 'family_room_1',
+    dims: `18'11" x 18'2"  — plan label "LIVING ROOM"`,
     photos: ['family_room_1.png', 'family_room_2.png', 'family_room_3.png'],
-    brief: `Opens to the breakfast nook and the REAR WINDOW WALL — white sliding glass doors plus a
-      FRENCH DOOR out to the deck. A SINGLE SUPPORT COLUMN mid-room. CROWN MOLDING, RED OAK floors,
-      recessed lights.`,
+    brief: `THE ROOM WITH THE FIREPLACE. This piece is called "family" after the photo filenames, but
+      on the floor plan it is the LIVING ROOM, 18'11" x 18'2" — use that room in dims.js.
+      A CORNER GAS FIREPLACE built of DRY-STACKED LEDGESTONE set across a canted corner, with a LIT
+      GAS FIRE behind the glass, a RAISED STONE HEARTH BENCH wrapping the base, and a freestanding
+      ROUND BLACK FLUE PIPE (~10") rising from the stone to the ceiling. TWO short awning/casement
+      windows flank the flue directly above the stone, one on each canted face. A tall casement
+      window on the left wall looking out to lawn and shrubs, another on the right wall. At the right
+      edge the WET BAR is just visible: near-black slab cabinets, black stone top, bar sink,
+      lit glass-door wine fridge. CROWN MOLDING throughout. RED OAK floors running north-south with a
+      strong anisotropic sheen streaking toward the windows. Bronze/oak-finish floor registers set
+      into the oak. White 5.25" baseboard, white casings with a mitered head cap. 6" white recessed
+      cans on a non-symmetrical grid. THE ROOM IS COMPLETELY EMPTY — no furniture whatsoever.`,
+  },
+  living: {
+    title: 'Rear-window room (plan: FAMILY ROOM)', level: 'first',
+    hero: 'view_from_kitchen_of_living_room_looking_out_to_backyard',
+    dims: `12'1" x 19'8"  — plan label "FAMILY ROOM"`,
+    photos: ['view_from_kitchen_of_living_room_looking_out_to_backyard.png'],
+    brief: `THE ROOM WITH THE REAR WINDOW WALL. This piece is called "living" after the photo
+      filename, but on the floor plan it is the FAMILY ROOM, 12'1" x 19'8" — use that room in
+      dims.js. It is SUNKEN one ~7" step down from the kitchen/hall level.
+      A REAR WINDOW WALL of white-framed floor-to-ceiling glass: a run of large fixed/slider panels
+      plus a WHITE FRENCH DOOR with a brass lever handle at the right, opening onto the composite
+      deck. A SINGLE SQUARE WHITE SUPPORT COLUMN stands mid-room in front of the glass. CROWN
+      MOLDING. RED OAK floors with heavy specular sheen from the window wall. A small high transom
+      window on the far left wall. Beyond the glass: the deck with its railing and a bench, a wood
+      fence, a very large mature tree, lawn. The kitchen cabinetry intrudes at the left edge of frame.
+      THE ROOM IS COMPLETELY EMPTY — no furniture whatsoever.`,
   },
   mudroom: {
     title: 'Mudroom / laundry', level: 'first', hero: 'mudroom_1', dims: `12'2" x 7'11"`,
@@ -284,6 +307,13 @@ repo ${REPO} (branch claude/3d-house-walkthrough-esjiau).
 READ FIRST, in this order:
   ${REPO}/docs/CONVENTIONS.md   (binding contract: units, axes, module layout, render settings)
   ${REPO}/docs/CRITIC.md        (how your work will be judged)
+  ${REPO}/docs/DETAILS.md       (exhaustive real-world detail checklist — read the GLOBAL RULES
+                                 section AND your own piece's section; it lists every outlet,
+                                 register, hinge, baseboard height, grout width and imperfection
+                                 that a camera catches, and it records exactly what IS and IS NOT
+                                 present in each room)
+  ${REPO}/docs/PHOTOGRAPHY.md   (the camera and grade we must match — lens, height, exposure,
+                                 black point, window blowout, noise, and the tuning table)
   ${REPO}/app/src/core/dims.js  (authoritative geometry — never contradict it)
 
 YOUR PIECE: "${p.id}" — ${p.title}${p.dims ? ` (${p.dims})` : ''} on the ${p.level} level.
@@ -319,6 +349,21 @@ Its verdict (confidence ${prev.confidence}):
 
 FIX THE BIGGEST GAP FIRST and properly — not cosmetically. Then work down the ranked list as far as
 you can. Do not regress anything that already matched.`}
+
+*** THE HOUSE IS VACANT. THIS OVERRIDES EVERYTHING. ***
+This house was photographed EMPTY, before staging. There is NO furniture, NO rugs, NO art, NO
+plants, NO curtains, NO towels, NO countertop items, NO bedding — in ANY room. The floor plans show
+furniture, but the floor plans are marketing illustrations and are WRONG about contents. The photos
+are the truth. An empty room rendered with a sofa in it loses the blind test in one second.
+
+The ONLY movable objects anywhere in the 47 photographs are: the coir "welcome home" doormat at the
+front door, the LG front-load washer and dryer, the kitchen appliances plus the wine fridge in the
+wet bar, the toilets, and one swing-arm magnifying mirror in the primary bath. Build those. Build
+nothing else that is not attached to the house.
+
+What fills these photographs instead is ARCHITECTURE and LIGHT: the floor, the trim, the cabinetry,
+the tile, the glass, the way daylight rakes across an empty wall and streaks along the oak. That is
+where all your effort goes. An empty room is HARDER to fake, not easier — there is nowhere to hide.
 
 CRAFT RULES (these are what separate a render from a photograph):
 - Model to the real dimensions in dims.js. If dims.js is wrong for your room, fix dims.js and

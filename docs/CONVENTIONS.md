@@ -8,6 +8,32 @@ invent a second convention; if something is missing here, add it here first.
 A Three.js walkthrough that is indistinguishable from the professional listing
 photos in `listing_photos/`. Photoreal is the bar, not "nice 3D".
 
+## 0.1 Two facts that override intuition
+
+**The house is VACANT.** Every one of the 47 listing photographs shows an empty, unstaged house:
+no furniture, rugs, art, plants, curtains, towels, bedding or countertop items. The floor plans
+*do* show furniture — the floor plans are marketing illustrations and are wrong about contents.
+The photographs are the truth. The only movable objects in the entire house are the coir
+"welcome home" doormat, the LG washer and dryer, the kitchen appliances, the wet-bar wine fridge,
+the toilets, and one swing-arm magnifying mirror in the primary bath.
+
+Consequence: all realism effort goes into architecture, materials and light — floor, trim,
+casework, tile, glass, and how daylight rakes an empty wall. An empty room is *harder* to fake
+than a furnished one, because there is nothing to hide behind.
+
+**The photo filenames are swapped against the floor-plan labels.**
+
+**Piece ids follow the PHOTO FILENAMES** (matching `docs/DETAILS.md` and `status.json`), so a piece
+id and its floor-plan room label disagree for exactly these two rooms:
+
+| piece id | listing photos | what it actually is | floor-plan label | size |
+|---|---|---|---|---|
+| `family` | `family_room_1/2/3.png` | corner ledgestone fireplace, lit gas fire, black flue, wet bar, sunken? no | **LIVING ROOM** | 18'11" x 18'2" |
+| `living` | `view_from_kitchen_of_living_room_looking_out_to_backyard.png` | rear window wall, white support column, French door, sunken one 7" step | **FAMILY ROOM** | 12'1" x 19'8" |
+
+So: **piece `family` builds the plan's LIVING ROOM, and piece `living` builds the plan's FAMILY
+ROOM.** This is deliberate. Do not "fix" it in either direction — just use the right dims.js room.
+
 ## 1. Units & axes
 
 - **1 world unit = 1 foot.** Always. Inches are fractions (`8/12`).
