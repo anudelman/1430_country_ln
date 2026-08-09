@@ -1,5 +1,4 @@
 node_modules/
 renders/blind/
-dist/
 *.log
 .scratch/
