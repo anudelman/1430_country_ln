@@ -584,7 +584,7 @@ function genLightPlankFloor(size) {
   const s = blank(size, [TU, TV]);
   const rng = mulberry32(0x51a7b);
 
-  const tones = [hexRGB('#d8c8ae'), hexRGB('#cfbfa6'), hexRGB('#dccdb5'), hexRGB('#c8b9a1')];
+  const tones = [hexRGB('#d3bd9c'), hexRGB('#cab494'), hexRGB('#d8c4a5'), hexRGB('#c4ad8c')];
   const rowsData = [];
   for (let r = 0; r < rows; r++) {
     const k = 2;
@@ -597,8 +597,8 @@ function genLightPlankFloor(size) {
   }
 
   const cfg = {
-    rings: 2.1, ringWidth: 0.05, warpFU: 5, warpFV: 2, warpAmp: 0.7,
-    fineFU: 6, fineFV: 190, fineAmt: 0.42,
+    rings: 1.9, ringWidth: 0.045, warpFU: 7, warpFV: 2, warpAmp: 1.15,
+    fineFU: 7, fineFV: 200, fineAmt: 0.34,
     poreFU: 260, poreFV: 120, poreThresh: 0.34, poreAmt: 0.35,
     fleckFU: 30, fleckFV: 20, fleckAmt: 0.10,
   };
@@ -619,10 +619,10 @@ function genLightPlankFloor(size) {
 
       let c = scaleRGB(b.tone, b.light);
       c = scaleRGB(c, 1 + fbmT(u01, v01, 3, 2, 3, b.seed + 9) * 0.05);
-      c = scaleRGB(c, 1 - g.ring * 0.16);
+      c = scaleRGB(c, 1 - g.band * 0.09 - g.ring * 0.17);
       // gray wash typical of coastal-oak LVP
-      c = mixRGB(c, [0.63, 0.61, 0.58], 0.16 + g.ring * 0.12);
-      c = mixRGB(c, scaleRGB(c, 0.72), g.pore * 0.5);
+      c = mixRGB(c, [0.66, 0.64, 0.61], 0.10 + g.ring * 0.10);
+      c = mixRGB(c, scaleRGB(c, 0.76), g.pore * 0.4);
 
       let h = 0.6 - g.pore * 0.45 - g.ring * 0.18;
       const bw = 0.045;
@@ -649,8 +649,8 @@ function quartzField(size, TU, TV, seedBase, bookMatch, veinAmt) {
   const s = blank(size, [TU, TV]);
   const base = hexRGB('#f4f3f0');
   const warm = hexRGB('#efece5');
-  const vein = hexRGB('#8f959c');
-  const veinSoft = hexRGB('#c6cacd');
+  const vein = hexRGB('#9aa0a4');
+  const veinSoft = hexRGB('#d5d7d7');
 
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
@@ -668,9 +668,9 @@ function quartzField(size, TU, TV, seedBase, bookMatch, veinAmt) {
       const primary = ridgedT(du, dv, 2, 3, 5, seedBase, 0.58);
       const secondary = ridgedT(du * 1.0, dv * 1.0, 4, 7, 4, seedBase + 101, 0.5);
 
-      const vMain = smoothstep(0.72, 0.955, primary);
-      const vHalo = smoothstep(0.40, 0.80, primary) * 0.85;
-      const vFine = smoothstep(0.74, 0.97, secondary) * 0.8;
+      const vMain = smoothstep(0.855, 0.985, primary);
+      const vHalo = smoothstep(0.60, 0.93, primary) * 0.45;
+      const vFine = smoothstep(0.86, 0.995, secondary) * 0.55;
 
       let c = mixRGB(base, warm, 0.5 + 0.5 * fbmT(u01, v01, 2, 2, 3, seedBase + 77));
       c = mixRGB(c, veinSoft, clamp01((vHalo * 0.55 + vFine * 0.45) * veinAmt));
@@ -713,7 +713,7 @@ function cabinetWood(size, TU, TV, palette, cfg, seedBase, rough, grayWash) {
   for (let i = 0; i < strips; i++) {
     stripTone.push({
       c: palette[(rng() * palette.length) | 0],
-      light: 0.94 + rng() * 0.14,
+      light: 0.965 + rng() * 0.075,
       seed: (rng() * 1e5) | 0,
     });
   }
@@ -729,7 +729,7 @@ function cabinetWood(size, TU, TV, palette, cfg, seedBase, rough, grayWash) {
       const g = woodGrain(v01, u01, t, st.seed, cfg);
       let c = scaleRGB(st.c, st.light);
       c = scaleRGB(c, 1 + fbmT(u01, v01, 3, 4, 3, st.seed + 3) * 0.06);
-      c = scaleRGB(c, 1 - g.ring * 0.13);
+      c = scaleRGB(c, 1 - g.band * 0.10 - g.ring * 0.155);
       c = mixRGB(c, scaleRGB(c, 0.75), g.pore * 0.30);
       c = mixRGB(c, scaleRGB(c, 1.06), g.fleck);
       if (grayWash > 0) c = mixRGB(c, [0.72, 0.70, 0.67], grayWash);
@@ -744,8 +744,8 @@ function cabinetWood(size, TU, TV, palette, cfg, seedBase, rough, grayWash) {
 }
 
 const CAB_GRAIN = {
-  rings: 2.6, ringWidth: 0.07, warpFU: 5, warpFV: 2, warpAmp: 1.0,
-  fineFU: 6, fineFV: 150, fineAmt: 0.32,
+  rings: 2.4, ringWidth: 0.05, warpFU: 7, warpFV: 2, warpAmp: 1.45,
+  fineFU: 8, fineFV: 170, fineAmt: 0.26,
   poreFU: 300, poreFV: 140, poreThresh: 0.22, poreAmt: 0.7,
   fleckFU: 36, fleckFV: 24, fleckAmt: 0.16,
 };
@@ -754,7 +754,7 @@ const CAB_GRAIN = {
 function genCherryCabinet(size) {
   return cabinetWood(
     size, 2.5, 3.0,
-    [hexRGB('#c8a780'), hexRGB('#c2a179'), hexRGB('#cfb08c'), hexRGB('#bd9c74')],
+    [hexRGB('#c39c72'), hexRGB('#bd966c'), hexRGB('#c9a47c'), hexRGB('#b88f66')],
     CAB_GRAIN, 6011, 0.30, 0.04
   );
 }
@@ -844,9 +844,9 @@ function paintSurface(size, TU, color, stipple, sheen, seedBase, brushed) {
   return s;
 }
 
-const genPaintedOffWhite = (n) => paintSurface(n, 3, '#ded7c9', 0.30, 0.31, 1201, true);
+const genPaintedOffWhite = (n) => paintSurface(n, 3, '#d2cabb', 0.30, 0.31, 1201, true);
 const genPaintedSlateBlue = (n) => paintSurface(n, 3, '#54707e', 0.30, 0.31, 1307, true);
-const genPaintedGreige = (n) => paintSurface(n, 3, '#c6b8a6', 0.30, 0.32, 1409, true);
+const genPaintedGreige = (n) => paintSurface(n, 3, '#bfb09c', 0.30, 0.32, 1409, true);
 const genWallPaintWhite = (n) => paintSurface(n, 4, '#eeeeec', 0.60, 0.62, 1511, false);
 const genWallPaintWarmWhite = (n) => paintSurface(n, 4, '#efeade', 0.60, 0.62, 1613, false);
 const genCeilingPaint = (n) => paintSurface(n, 4, '#f7f7f6', 0.65, 0.90, 1717, false);
@@ -1087,10 +1087,10 @@ function genMarbleLookTile(size) {
   const s = blank(size, [TU, TV]);
   const grout = hexRGB('#cbbca4');
   const GW = 0.010;
-  const base = hexRGB('#d9c9ab');
-  const pale = hexRGB('#e7dbc4');
-  const deep = hexRGB('#bda787');
-  const vein = hexRGB('#a8916f');
+  const base = hexRGB('#d2bf9c');
+  const pale = hexRGB('#e0d1b4');
+  const deep = hexRGB('#b39c78');
+  const vein = hexRGB('#9c8563');
 
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
@@ -1125,11 +1125,11 @@ function genMarbleLookTile(size) {
       c = scaleRGB(c, 0.95 + ((tk >>> 2) & 255) / 255 * 0.10);
       // travertine pitting
       const pit = worleyT(nu, nv, 26, 26, 818, 1);
-      const pd = smoothstep(0.10, 0.0, pit.f1) * (((pit.id >>> 7) & 7) < 2 ? 1 : 0);
-      c = scaleRGB(c, 1 - pd * 0.18);
+      const pd = smoothstep(0.07, 0.0, pit.f1) * (((pit.id >>> 7) & 7) < 2 ? 1 : 0);
+      c = scaleRGB(c, 1 - pd * 0.10);
 
       const r = clamp01(0.28 + (1 - cloud) * 0.10 + pd * 0.25);
-      setPx(s, i, c, 0.62 - pd * 0.45, r);
+      setPx(s, i, c, 0.62 - pd * 0.30, r);
     }
   }
   s.reliefFt = 0.008;
@@ -1191,7 +1191,7 @@ function genCarpetTan(size) {
   const base = hexRGB('#c9b598');
   const d2 = hexRGB('#9c8767');
   const lite = hexRGB('#e3d6bd');
-  const LOOPS = 62; // ~0.19" loop pitch
+  const LOOPS = 78; // ~0.15" loop pitch
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
     for (let x = 0; x < size; x++) {
@@ -1203,12 +1203,12 @@ function genCarpetTan(size) {
       // alternating row height (berber has paired loops)
       const rowMod = ((w.id >>> 5) & 3) === 0 ? 0.6 : 1.0;
       // large cloudy shading from pile direction
-      const cloud = fbmT(u01, v01, 3, 3, 4, 4242) * 0.5 + 0.5;
-      const fiber = fbmT(u01, v01, 220, 90, 2, 88);
-      let c = mixRGB(d2, base, smoothstep(0.15, 0.85, cloud));
-      c = mixRGB(c, lite, loop * 0.60 * rowMod);
-      c = scaleRGB(c, 1 + fiber * 0.11);
-      c = scaleRGB(c, 0.78 + loop * 0.36);
+      const cloud = fbmT(u01, v01, 2, 2, 3, 4242) * 0.5 + 0.5;
+      const fiber = fbmT(u01, v01, 260, 110, 2, 88);
+      let c = mixRGB(d2, base, smoothstep(-0.15, 1.15, cloud));
+      c = mixRGB(c, lite, loop * 0.34 * rowMod);
+      c = scaleRGB(c, 1 + fiber * 0.07);
+      c = scaleRGB(c, 0.90 + loop * 0.18);
       const h = loop * rowMod * 0.9 + fiber * 0.1;
       setPx(s, i, c, clamp01(h), clamp01(0.86 - loop * 0.10 + fiber * 0.03));
     }
@@ -1233,7 +1233,7 @@ function genCarpetBeige(size) {
     const v01 = (y + 0.5) / size;
     for (let x = 0; x < size; x++) {
       const u01 = (x + 0.5) / size;
-      f[y * size + x] = fbmT(u01, v01, 460, 210, 3, 6767) * 0.5 + 0.5;
+      f[y * size + x] = fbmT(u01, v01, 520, 240, 3, 6767, 0.62) * 0.5 + 0.5;
     }
   }
   const streaked = streak(f, size, Math.max(1, Math.round(size * 0.004)), 0);
@@ -1244,16 +1244,18 @@ function genCarpetBeige(size) {
       const i = y * size + x;
       const tuft = streaked[i];
       const cloud = fbmT(u01, v01, 2, 2, 4, 8181) * 0.5 + 0.5;
-      const nap = fbmT(u01, v01, 4, 6, 3, 9191) * 0.5 + 0.5;
-      let c = mixRGB(dark, base, smoothstep(0.2, 0.9, cloud));
-      c = mixRGB(c, lite, smoothstep(0.4, 0.9, nap) * 0.5);
-      c = scaleRGB(c, 0.82 + tuft * 0.36);
-      const h = tuft * 0.85 + cloud * 0.15;
+      const nap = fbmT(u01, v01, 5, 7, 3, 9191) * 0.5 + 0.5;
+      const tick = fbmT(u01, v01, 700, 330, 2, 9292) * 0.5 + 0.5;
+      let c = mixRGB(dark, base, smoothstep(0.15, 0.95, cloud));
+      c = mixRGB(c, lite, smoothstep(0.4, 0.9, nap) * 0.45);
+      c = scaleRGB(c, 0.74 + tuft * 0.46);
+      c = scaleRGB(c, 0.94 + tick * 0.13);
+      const h = tuft * 0.72 + tick * 0.20 + cloud * 0.08;
       setPx(s, i, c, clamp01(h), clamp01(0.90 - tuft * 0.06));
     }
   }
-  s.reliefFt = 0.0075;
-  s.aoStrength = 2.2;
+  s.reliefFt = 0.012;
+  s.aoStrength = 3.0;
   s.aoRadius = 0.02;
   return s;
 }
@@ -1343,7 +1345,7 @@ function genGrayLapSiding(size) {
       const grain = fbmT(u01, v01, 12, 420, 3, rt.seed);
       const saw = fbmT(u01, v01, 6, 500, 2, rt.seed + 13);
       const weather = fbmT(u01, v01, 90, 5, 3, 4141);
-      let c = scaleRGB(rt.c, rt.k * (1 + grain * 0.14 + saw * 0.07));
+      let c = scaleRGB(rt.c, rt.k * (1 + grain * 0.085 + saw * 0.04));
       c = scaleRGB(c, 1 + weather * 0.06);
       c = mixRGB(c, [0.42, 0.43, 0.41], smoothstep(0.55, 1.0, weather) * 0.18);
 
@@ -1356,8 +1358,8 @@ function genGrayLapSiding(size) {
         h = mix(0.0, h, 1 - k * 0.95);
       }
       // occasional vertical butt joint between siding boards
-      const bj = Math.abs(((u01 * 3 + (row * 0.37)) % 1) - 0.5);
-      if (bj > 0.4965) { shade *= 0.72; h *= 0.55; }
+      const bj = Math.abs(((u01 + row * 0.37) % 1) - 0.5);
+      if (bj > 0.4988) { shade *= 0.75; h *= 0.55; }
       c = scaleRGB(c, shade);
       const r = clamp01(0.68 + grain * 0.08 + weather * 0.05);
       setPx(s, i, c, clamp01(h), r);
