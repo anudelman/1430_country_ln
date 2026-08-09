@@ -1,0 +1,24 @@
+{
+  "name": "1430_country_ln",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anudelman/1430_country_ln.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/anudelman/1430_country_ln/issues"
+  },
+  "homepage": "https://github.com/anudelman/1430_country_ln#readme",
+  "dependencies": {
+    "playwright-core": "^1.56.0",
+    "three": "^0.180.0"
+  }
+}
