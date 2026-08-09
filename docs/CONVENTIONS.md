@@ -28,8 +28,12 @@ id and its floor-plan room label disagree for exactly these two rooms:
 
 | piece id | listing photos | what it actually is | floor-plan label | size |
 |---|---|---|---|---|
-| `family` | `family_room_1/2/3.png` | corner ledgestone fireplace, lit gas fire, black flue, wet bar, sunken? no | **LIVING ROOM** | 18'11" x 18'2" |
-| `living` | `view_from_kitchen_of_living_room_looking_out_to_backyard.png` | rear window wall, white support column, French door, sunken one 7" step | **FAMILY ROOM** | 12'1" x 19'8" |
+| `family` | `family_room_1/2/3.png` | corner ledgestone fireplace, lit gas fire, black flue, wet bar — **SUNKEN one 7" step** below the kitchen/hall | **LIVING ROOM** | 18'11" x 18'2" |
+| `living` | `view_from_kitchen_of_living_room_looking_out_to_backyard.png` | rear window wall, white support column, French door — **not** sunken | **FAMILY ROOM** | 12'1" x 19'8" |
+
+The sunken room is the **fireplace** room, confirmed directly in `family_room_3.png` (two steps up
+to the kitchen at the left of frame). `dims.js` encodes it as `ROOMS.livingRoom.floorOffset` plus a
+`STEPS` entry — correct as written.
 
 So: **piece `family` builds the plan's LIVING ROOM, and piece `living` builds the plan's FAMILY
 ROOM.** This is deliberate. Do not "fix" it in either direction — just use the right dims.js room.

@@ -118,6 +118,8 @@ const ALL_PIECES = {
     photos: ['family_room_1.png', 'family_room_2.png', 'family_room_3.png'],
     brief: `THE ROOM WITH THE FIREPLACE. This piece is called "family" after the photo filenames, but
       on the floor plan it is the LIVING ROOM, 18'11" x 18'2" — use that room in dims.js.
+      IT IS SUNKEN one ~7" step below the kitchen/hall level (two steps are visible at the left of
+      family_room_3.png); dims.js encodes this as ROOMS.livingRoom.floorOffset plus a STEPS entry.
       A CORNER GAS FIREPLACE built of DRY-STACKED LEDGESTONE set across a canted corner, with a LIT
       GAS FIRE behind the glass, a RAISED STONE HEARTH BENCH wrapping the base, and a freestanding
       ROUND BLACK FLUE PIPE (~10") rising from the stone to the ceiling. TWO short awning/casement
@@ -136,7 +138,7 @@ const ALL_PIECES = {
     photos: ['view_from_kitchen_of_living_room_looking_out_to_backyard.png'],
     brief: `THE ROOM WITH THE REAR WINDOW WALL. This piece is called "living" after the photo
       filename, but on the floor plan it is the FAMILY ROOM, 12'1" x 19'8" — use that room in
-      dims.js. It is SUNKEN one ~7" step down from the kitchen/hall level.
+      dims.js. This room is NOT sunken (the sunken room is the fireplace room, piece `family`).
       A REAR WINDOW WALL of white-framed floor-to-ceiling glass: a run of large fixed/slider panels
       plus a WHITE FRENCH DOOR with a brass lever handle at the right, opening onto the composite
       deck. A SINGLE SQUARE WHITE SUPPORT COLUMN stands mid-room in front of the glass. CROWN

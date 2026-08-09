@@ -586,15 +586,40 @@ async function buildScene(level, only) {
 
   const isExterior = level === 'exterior';
 
-  /* ---- sky + environment --------------------------------------------- */
+  /* ---- sky + environment ----------------------------------------------
+   * The level's LIGHT_PRESET owns the environment description (wall / floor
+   * bounce colours, turbidity, intensity) as well as the analytic lights.
+   * Building the env without it gave every interior a dark, brown ceiling:
+   * the ceiling only ever sees the environment's floor hemisphere. */
+  const lp = mod.lighting && typeof mod.lighting.lightPreset === 'function'
+    ? mod.lighting.lightPreset(isExterior ? 'exterior' : level)
+    : null;
+  const envCfg = (lp && lp.env) || {};
   if (mod.env && typeof mod.env.makeSkyEnv === 'function') {
     try {
-      skyEnv = mod.env.makeSkyEnv(renderer, { quality: state.quality });
+      skyEnv = mod.env.makeSkyEnv(renderer, {
+        quality: state.quality,
+        turbidity: envCfg.turbidity,
+        sunAzimuth: lp && lp.sun ? lp.sun.azimuth : undefined,
+        sunElevation: lp && lp.sun ? lp.sun.elevation : undefined,
+        intensity: envCfg.kind === 'sky' && envCfg.intensity !== undefined ? envCfg.intensity : 1.0,
+      });
       if (skyEnv.skyMesh) scene.add(skyEnv.skyMesh);
-      if (isExterior) {
+      if (isExterior || envCfg.kind === 'sky' || typeof mod.env.makeIndoorEnv !== 'function') {
         mod.env.applyEnvironment(scene, skyEnv.envTexture, { intensity: 1.0, background: false });
-      } else if (typeof mod.env.makeIndoorEnv === 'function') {
-        indoorEnv = mod.env.makeIndoorEnv(renderer, { quality: state.quality });
+      } else {
+        indoorEnv = mod.env.makeIndoorEnv(renderer, {
+          quality: state.quality,
+          wallColor: envCfg.wallColor,
+          floorColor: envCfg.floorColor,
+          ceilingColor: envCfg.ceilingColor,
+          windowColor: envCfg.windowColor,
+          windowIntensity: envCfg.windowIntensity,
+          wallFactor: envCfg.wallFactor,
+          floorFactor: envCfg.floorFactor,
+          ceilingBoost: envCfg.ceilingBoost,
+          intensity: envCfg.intensity === undefined ? 1.0 : envCfg.intensity,
+        });
         mod.env.applyEnvironment(scene, indoorEnv.envTexture, { intensity: 1.0, background: false });
       }
     } catch (err) {
@@ -627,6 +652,8 @@ async function buildScene(level, only) {
     quality: state.quality,
     level,
     room: only || null,
+    shell: null,
+    onWarn: warn,
   };
 
   let built = 0;
@@ -634,7 +661,9 @@ async function buildScene(level, only) {
   const shellBuild = pickFn(mod.shell, ['buildShell', 'build', 'buildLevel']);
   if (shellBuild) {
     try {
-      shellBuild(Object.assign({}, ctx, { group }));
+      // The shell handle goes into every room's ctx: a room that wants its own
+      // floor or a wall gone calls ctx.shell.hideFloor(id) / hideWall(id).
+      ctx.shell = shellBuild(Object.assign({}, ctx, { group })) || null;
       built++;
     } catch (err) {
       warn('shell.js build failed: ' + ((err && err.message) || err));
@@ -673,7 +702,10 @@ async function buildScene(level, only) {
       lightRig = mod.lighting.applyLightPreset(scene, isExterior ? 'exterior' : level, {
         quality: state.quality,
         renderer,
-        bounds: isExterior ? [-140, -12, -160, 200, 60, 120] : null,
+        // A directional light needs a finite shadow frustum. Interiors get the
+        // house bounding box (dims: 0..60.7 x, 0..45.1 z) with a margin, so the
+        // 2048 map is spent on the house instead of the whole site.
+        bounds: isExterior ? [-140, -12, -160, 200, 60, 120] : [-14, -12, -14, 76, 30, 60],
       });
     } catch (err) {
       warn('lighting.js failed: ' + ((err && err.message) || err));

@@ -987,8 +987,12 @@ export function coveLight(rect, {
  */
 export function bakeAmbientFill(scene, {
   intensity = 1.0,
-  color = 0xfff4e8,
-  groundColor = 0xc9b79c,
+  // Near-neutral. A HemisphereLight's GROUND colour lights downward-facing surfaces — i.e. the
+  // ceiling — so a saturated tan here turns every ceiling pink. docs/PHOTOGRAPHY.md measures the
+  // real ceilings at a near-neutral 193-197 with only a slight warm cast, so both ends stay close
+  // to white and the warmth comes from the light colour, not the bounce tint.
+  color = 0xfff6ec,
+  groundColor = 0xded8d0,
   skyColor,
   hemi: hemiShare = 0.55,
   ambient: ambientShare = 0.20,
@@ -1070,9 +1074,20 @@ export const LIGHT_PRESETS = Object.freeze({
   first: Object.freeze({
     name: 'first',
     exposure: 1.0,
-    env: { kind: 'indoor', wallColor: 0xf3f1ee, floorColor: 0xb98a55, intensity: 0.95 },
+    // A ceiling sees ONLY the environment's lower hemisphere, so floorColor x floorFactor is
+    // literally the ceiling's colour. floorFactor was 0.66 against a saturated 0xb98a55 oak,
+    // which rendered every ceiling salmon pink. docs/PHOTOGRAPHY.md measures the real ceilings at
+    // a near-neutral 193-197, so the bounce is desaturated and its weight brought back near the
+    // env.js default (0.15), with the ceiling lit mostly by its own boost and the walls.
+    env: { kind: 'indoor', wallColor: 0xf3f1ee, floorColor: 0xc7ab8c, intensity: 1.28,
+      wallFactor: 0.44, floorFactor: 0.20, ceilingBoost: 0.62, ceilingColor: 0xfbf9f6 },
     sun: { azimuth: 208, elevation: 52, intensity: 9.0, color: 0xfff1da },
-    fill: { intensity: 0.42, color: 0xfff4e8, groundColor: 0xc9b79c },
+    // groundColor is what lights a DOWN-facing normal, i.e. the ceiling. The
+    // reference photos put the ceiling within ~5 L of the walls (185/181);
+    // without GI only this hemisphere term can close that gap, so the "ground"
+    // here is the bright bounce off a sunlit oak floor, not a dark floor.
+    fill: { intensity: 0.62, color: 0xfff4e8, groundColor: 0xfff3e2, skyColor: 0xd9e2ec,
+      hemi: 0.66, ambient: 0.12, onAxis: 0.22 },
     can: { temp: 2900, intensity: 46, angle: 0.95, penumbra: 0.85 },
     pendant: { temp: 2800, intensity: 18 },
     window: { intensity: 3.0, color: 0xdfeaf7, glowIntensity: 1.1 },
@@ -1081,9 +1096,11 @@ export const LIGHT_PRESETS = Object.freeze({
   second: Object.freeze({
     name: 'second',
     exposure: 1.0,
-    env: { kind: 'indoor', wallColor: 0xf4f2ef, floorColor: 0xcbb79a, intensity: 0.9 },
+    env: { kind: 'indoor', wallColor: 0xf4f2ef, floorColor: 0xd5c7b3, intensity: 1.22,
+      wallFactor: 0.44, floorFactor: 0.20, ceilingBoost: 0.60, ceilingColor: 0xfbf9f6 },
     sun: { azimuth: 214, elevation: 56, intensity: 8.6, color: 0xfff2de },
-    fill: { intensity: 0.40, color: 0xfff5ea, groundColor: 0xd3c4ad },
+    fill: { intensity: 0.60, color: 0xfff5ea, groundColor: 0xfff4e6, skyColor: 0xdde5ee,
+      hemi: 0.66, ambient: 0.12, onAxis: 0.22 },
     can: { temp: 2900, intensity: 42, angle: 0.98, penumbra: 0.88 },
     pendant: { temp: 2800, intensity: 16 },
     window: { intensity: 3.2, color: 0xe2ecf8, glowIntensity: 1.15 },
@@ -1094,9 +1111,11 @@ export const LIGHT_PRESETS = Object.freeze({
     exposure: 1.05,
     // Almost no daylight: two small egress wells. The cans do all the work,
     // and the fill keeps the corners from going muddy.
-    env: { kind: 'indoor', wallColor: 0xf2f0ed, floorColor: 0xd8c6a8, intensity: 0.55, windowIntensity: 0.35 },
+    env: { kind: 'indoor', wallColor: 0xf2f0ed, floorColor: 0xded2c0, intensity: 0.95, windowIntensity: 0.35,
+      wallFactor: 0.40, floorFactor: 0.18, ceilingBoost: 0.54, ceilingColor: 0xfaf8f5 },
     sun: null,
-    fill: { intensity: 0.34, color: 0xfff2e2, groundColor: 0xcabda6 },
+    fill: { intensity: 0.52, color: 0xfff2e2, groundColor: 0xfdf0dd, skyColor: 0xd6ccbb,
+      hemi: 0.66, ambient: 0.12, onAxis: 0.22 },
     can: { temp: 2900, intensity: 58, angle: 1.0, penumbra: 0.88 },
     pendant: { temp: 2800, intensity: 20 },
     window: { intensity: 2.4, color: 0xd8e5f2, glowIntensity: 1.0 },
