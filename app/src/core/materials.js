@@ -31,7 +31,7 @@ import { makeTextures, TEXTURE_INFO, TEXTURE_NAMES } from './textures.js';
 /* Helpers                                                                   */
 /* ======================================================================== */
 
-const MAP_KEYS = ['map', 'normalMap', 'roughnessMap', 'aoMap', 'metalnessMap'];
+const MAP_KEYS = ['map', 'normalMap', 'roughnessMap', 'aoMap', 'metalnessMap', 'anisotropyMap'];
 
 /**
  * Attach a texture set to a material description and remember the real-world
@@ -55,6 +55,13 @@ function withMaps(THREE, mat, set, opts = {}) {
   if (set.metalnessMap && opts.metalnessMap !== false) {
     mat.metalnessMap = set.metalnessMap;
     mat.metalness = opts.metalness === undefined ? 1.0 : opts.metalness;
+  }
+  // KHR_materials_anisotropy: the map's B channel scales `mat.anisotropy`, so
+  // the scalar must be non-zero for three to compile USE_ANISOTROPY at all.
+  if (set.anisotropyMap && opts.anisotropy !== false) {
+    mat.anisotropyMap = set.anisotropyMap;
+    mat.anisotropy = opts.anisotropy === undefined ? 1.0 : opts.anisotropy;
+    mat.anisotropyRotation = opts.anisotropyRotation || 0;
   }
   mat.userData.scaleFeet = set.scaleFeet.slice();
   mat.userData.textureName = set.name;
@@ -83,288 +90,353 @@ export function makeMaterials(THREE, opts = {}) {
   const quality = opts.quality === 'draft' ? 'draft' : opts.quality || 'high';
   const tex = makeTextures({ quality });
   const T = (n) => tex.get(n);
+
+  /* ----------------------------------------------------------------------
+   * LAZY BY CONSTRUCTION.
+   *
+   * Every material below is registered as a THUNK, not built here.  Building
+   * all 42 eagerly forces textures.js to generate all 42 procedural map sets,
+   * which is ~217 s of pure JS at quality:'high' (measured under SwiftShader) —
+   * longer than the screenshot harness's whole timeout, for a room that may
+   * touch six of them.  A getter builds one material the first time something
+   * reads it, and caches it forever.
+   *
+   * Consequences a caller must know about:
+   *   - `Object.keys(M)` is cheap and complete; `Object.values(M)` is NOT —
+   *     it builds the entire library.  Never enumerate values to "collect"
+   *     materials; every library material carries `userData.keep = true`
+   *     instead, so scene teardown can recognise a shared material without
+   *     touching one that was never built.
+   *   - `M.dispose()` only disposes what was actually built.
+   * -------------------------------------------------------------------- */
   const M = {};
+  const BUILT = new Map();
+  const THUNKS = new Map();
+
+  function def(name, make) {
+    THUNKS.set(name, make);
+    Object.defineProperty(M, name, {
+      enumerable: true,
+      configurable: false,
+      get() {
+        let m = BUILT.get(name);
+        if (m) return m;
+        m = make();
+        m.name = name;
+        if (!m.userData.scaleFeet) m.userData.scaleFeet = [1, 1];
+        // Shared library material: scene teardown must never dispose it.
+        m.userData.keep = true;
+        BUILT.set(name, m);
+        return m;
+      },
+    });
+  }
 
   /* ------------------------------------------------------------ floors */
 
   // Site-finished red oak: satin polyurethane film over open-pore oak.
-  M.redOakFloor = withMaps(THREE, phys(THREE, {
+  // The satin sheen is ANISOTROPIC — the film's micro-grooves run with the
+  // boards, so the window highlight smears into a long streak down the strips
+  // instead of blooming into a round hotspot.  That streak is one of the most
+  // recognisable things about a real site-finished floor.
+  def('redOakFloor', () => withMaps(THREE, phys(THREE, {
     color: 0xffffff,
     metalness: 0.0,
-    clearcoat: 0.62,
-    clearcoatRoughness: 0.22,
-    envMapIntensity: 0.85,
+    clearcoat: 0.48,
+    clearcoatRoughness: 0.28,
+    envMapIntensity: 0.70,
     sheen: 0.0,
-  }), T('redOakFloor'), { normalScale: 1.0, aoMapIntensity: 0.85 });
+  }), T('redOakFloor'), {
+    normalScale: 1.0, aoMapIntensity: 0.7,
+    anisotropy: 0.85, anisotropyRotation: 0,
+  }));
 
-  M.lightPlankFloor = withMaps(THREE, phys(THREE, {
+  def('lightPlankFloor', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.25,
     clearcoatRoughness: 0.45,
     envMapIntensity: 0.7,
-  }), T('lightPlankFloor'), { normalScale: 1.0, aoMapIntensity: 0.9 });
+  }), T('lightPlankFloor'), { normalScale: 1.0, aoMapIntensity: 0.9 }));
 
-  M.carpetTan = withMaps(THREE, phys(THREE, {
+  // Cut pile (primary bedroom).  The nap is a directional microstructure, so
+  // it gets sheen AND anisotropy: the pile leans one way, and the bands that
+  // lean toward the camera go pale while the ones leaning away go dark.  That
+  // view dependence is the whole reason vacuum tracks are visible at all.
+  def('carpetTan', () => withMaps(THREE, phys(THREE, {
+    metalness: 0.0,
+    sheen: 0.75,
+    sheenRoughness: 0.85,
+    sheenColor: new THREE.Color(0xe4dbcd),
+    envMapIntensity: 0.5,
+  }), T('carpetTan'), {
+    normalScale: 1.0, aoMapIntensity: 0.9,
+    anisotropy: 1.0, anisotropyRotation: 0,
+  }));
+
+  // Loop pile (basement / secondary bedrooms): denser, flatter, less sheen.
+  def('carpetBeige', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     sheen: 0.55,
     sheenRoughness: 0.9,
-    sheenColor: new THREE.Color(0xd9c9ad),
-    envMapIntensity: 0.5,
-  }), T('carpetTan'), { normalScale: 1.0, aoMapIntensity: 1.0 });
+    sheenColor: new THREE.Color(0xded0b9),
+    envMapIntensity: 0.45,
+  }), T('carpetBeige'), {
+    normalScale: 0.9, aoMapIntensity: 0.95,
+    anisotropy: 1.0, anisotropyRotation: 0,
+  }));
 
-  M.carpetBeige = withMaps(THREE, phys(THREE, {
-    metalness: 0.0,
-    sheen: 0.7,
-    sheenRoughness: 0.85,
-    sheenColor: new THREE.Color(0xefe3cd),
-    envMapIntensity: 0.5,
-  }), T('carpetBeige'), { normalScale: 0.9, aoMapIntensity: 0.9 });
-
-  M.rubberGymFloor = withMaps(THREE, phys(THREE, {
+  def('rubberGymFloor', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.10,
     clearcoatRoughness: 0.7,
     envMapIntensity: 0.6,
-  }), T('rubberGymFloor'), { normalScale: 0.8 });
+  }), T('rubberGymFloor'), { normalScale: 0.8 }));
 
-  M.compositeDeck = withMaps(THREE, phys(THREE, {
+  def('compositeDeck', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.12,
     clearcoatRoughness: 0.65,
     envMapIntensity: 0.9,
-  }), T('compositeDeck'), { normalScale: 1.0, aoMapIntensity: 1.0 });
+  }), T('compositeDeck'), { normalScale: 1.0, aoMapIntensity: 1.0 }));
 
-  M.sunroomDeckSlat = withMaps(THREE, phys(THREE, {
+  def('sunroomDeckSlat', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.18,
     clearcoatRoughness: 0.5,
     envMapIntensity: 0.8,
-  }), T('sunroomDeckSlat'), { normalScale: 1.0, aoMapIntensity: 1.0 });
+  }), T('sunroomDeckSlat'), { normalScale: 1.0, aoMapIntensity: 1.0 }));
 
   /* -------------------------------------------------------- stone & tile */
 
   // Polished quartz: hard, near-mirror film over a low-scatter body.
-  M.quartzWhite = withMaps(THREE, phys(THREE, {
+  def('quartzWhite', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.85,
     clearcoatRoughness: 0.045,
     reflectivity: 0.6,
     envMapIntensity: 1.15,
-  }), T('quartzWhite'), { normalScale: 0.35, aoMapIntensity: 0.35 });
+  }), T('quartzWhite'), { normalScale: 0.35, aoMapIntensity: 0.35 }));
 
-  M.quartzSlabBacksplash = withMaps(THREE, phys(THREE, {
+  def('quartzSlabBacksplash', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.8,
     clearcoatRoughness: 0.06,
     reflectivity: 0.58,
     envMapIntensity: 1.05,
-  }), T('quartzSlabBacksplash'), { normalScale: 0.3, aoMapIntensity: 0.3 });
+  }), T('quartzSlabBacksplash'), { normalScale: 0.3, aoMapIntensity: 0.3 }));
 
-  M.blackGranite = withMaps(THREE, phys(THREE, {
+  def('blackGranite', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.95,
     clearcoatRoughness: 0.035,
     reflectivity: 0.65,
     envMapIntensity: 1.3,
-  }), T('blackGranite'), { normalScale: 0.3, aoMapIntensity: 0.3 });
+  }), T('blackGranite'), { normalScale: 0.3, aoMapIntensity: 0.3 }));
 
-  M.bronzePorcelain = withMaps(THREE, phys(THREE, {
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.18,
-    envMapIntensity: 1.1,
-  }), T('bronzePorcelain'), { normalScale: 1.0, aoMapIntensity: 1.0 });
+  // Metallic-look glazed porcelain: a glassy clearcoat over a partly
+  // conductive body, which is what gives the tub its clear reflection in
+  // `master_bedroom_bathroom_view_1`.
+  def('bronzePorcelain', () => withMaps(THREE, phys(THREE, {
+    clearcoat: 0.85,
+    clearcoatRoughness: 0.10,
+    reflectivity: 0.6,
+    envMapIntensity: 1.25,
+  }), T('bronzePorcelain'), { normalScale: 0.8, aoMapIntensity: 1.0 }));
 
-  M.bronzePorcelainFloor = withMaps(THREE, phys(THREE, {
+  // The floor is a DIFFERENT product: matt-glazed, warm, barely reflective.
+  def('bronzePorcelainFloor', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.3,
-    envMapIntensity: 0.95,
-  }), T('bronzePorcelainFloor'), { normalScale: 1.0, aoMapIntensity: 1.0 });
+    clearcoat: 0.30,
+    clearcoatRoughness: 0.34,
+    envMapIntensity: 0.9,
+  }), T('bronzePorcelainFloor'), { normalScale: 1.0, aoMapIntensity: 1.0 }));
 
-  M.marbleLookTile = withMaps(THREE, phys(THREE, {
+  def('marbleLookTile', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.5,
     clearcoatRoughness: 0.22,
     envMapIntensity: 1.0,
-  }), T('marbleLookTile'), { normalScale: 1.0, aoMapIntensity: 1.0 });
+  }), T('marbleLookTile'), { normalScale: 1.0, aoMapIntensity: 1.0 }));
 
-  M.mosaicAccent = withMaps(THREE, phys(THREE, {
+  def('mosaicAccent', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.55,
     clearcoatRoughness: 0.2,
     envMapIntensity: 1.0,
-  }), T('mosaicAccent'), { normalScale: 1.0, aoMapIntensity: 1.1 });
+  }), T('mosaicAccent'), { normalScale: 1.0, aoMapIntensity: 1.1 }));
 
-  M.bluestone = withMaps(THREE, phys(THREE, {
+  def('bluestone', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.8,
-  }), T('bluestone'), { normalScale: 1.0, aoMapIntensity: 1.0 });
+  }), T('bluestone'), { normalScale: 1.0, aoMapIntensity: 1.0 }));
 
-  M.stackedLimestone = withMaps(THREE, phys(THREE, {
+  def('stackedLimestone', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.75,
-  }), T('stackedLimestone'), { normalScale: 1.0, aoMapIntensity: 1.15 });
+  }), T('stackedLimestone'), { normalScale: 1.0, aoMapIntensity: 1.15 }));
 
-  M.concreteDriveway = withMaps(THREE, phys(THREE, {
+  def('concreteDriveway', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.8,
-  }), T('concreteDriveway'), { normalScale: 0.8 });
+  }), T('concreteDriveway'), { normalScale: 0.8 }));
 
   /* ---------------------------------------------------------------- wood */
 
-  M.cherryCabinet = withMaps(THREE, phys(THREE, {
+  def('cherryCabinet', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.5,
     clearcoatRoughness: 0.24,
     envMapIntensity: 0.85,
-  }), T('cherryCabinet'), { normalScale: 0.9 });
+  }), T('cherryCabinet'), { normalScale: 0.9 }));
 
-  M.cherryCabinetDark = withMaps(THREE, phys(THREE, {
+  def('cherryCabinetDark', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.40,
     clearcoatRoughness: 0.28,
     envMapIntensity: 0.85,
-  }), T('cherryCabinetDark'), { normalScale: 0.9 });
+  }), T('cherryCabinetDark'), { normalScale: 0.9 }));
 
-  M.butcherBlock = withMaps(THREE, phys(THREE, {
+  def('butcherBlock', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.35,
     clearcoatRoughness: 0.3,
     envMapIntensity: 0.8,
-  }), T('butcherBlock'), { normalScale: 0.9 });
+  }), T('butcherBlock'), { normalScale: 0.9 }));
 
-  M.woodSlatWall = withMaps(THREE, phys(THREE, {
+  def('woodSlatWall', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.3,
     clearcoatRoughness: 0.35,
     envMapIntensity: 0.8,
-  }), T('woodSlatWall'), { normalScale: 1.0, aoMapIntensity: 1.25 });
+  }), T('woodSlatWall'), { normalScale: 1.0, aoMapIntensity: 1.25 }));
 
-  M.blackBacker = withMaps(THREE, phys(THREE, {
+  def('blackBacker', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.25,
-  }), T('blackBacker'), { normalScale: 0.6 });
+  }), T('blackBacker'), { normalScale: 0.6 }));
 
   /* --------------------------------------------------------------- paint */
 
-  M.paintedOffWhite = withMaps(THREE, phys(THREE, {
+  def('paintedOffWhite', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.35,
     clearcoatRoughness: 0.3,
     envMapIntensity: 0.8,
-  }), T('paintedOffWhite'), { normalScale: 0.7 });
+  }), T('paintedOffWhite'), { normalScale: 0.7 }));
 
-  M.paintedSlateBlue = withMaps(THREE, phys(THREE, {
+  def('paintedSlateBlue', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.35,
     clearcoatRoughness: 0.3,
     envMapIntensity: 0.8,
-  }), T('paintedSlateBlue'), { normalScale: 0.7 });
+  }), T('paintedSlateBlue'), { normalScale: 0.7 }));
 
-  M.paintedGreige = withMaps(THREE, phys(THREE, {
+  def('paintedGreige', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.32,
     clearcoatRoughness: 0.32,
     envMapIntensity: 0.8,
-  }), T('paintedGreige'), { normalScale: 0.7 });
+  }), T('paintedGreige'), { normalScale: 0.7 }));
 
-  M.wallPaintWhite = withMaps(THREE, phys(THREE, {
+  def('wallPaintWhite', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.7,
-  }), T('wallPaintWhite'), { normalScale: 0.45, aoMapIntensity: 0.5 });
+  }), T('wallPaintWhite'), { normalScale: 0.45, aoMapIntensity: 0.5 }));
 
-  M.wallPaintWarmWhite = withMaps(THREE, phys(THREE, {
+  def('wallPaintWarmWhite', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.7,
-  }), T('wallPaintWarmWhite'), { normalScale: 0.45, aoMapIntensity: 0.5 });
+  }), T('wallPaintWarmWhite'), { normalScale: 0.45, aoMapIntensity: 0.5 }));
 
-  M.ceilingPaint = withMaps(THREE, phys(THREE, {
+  def('ceilingPaint', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.6,
-  }), T('ceilingPaint'), { normalScale: 0.35, aoMapIntensity: 0.4 });
+  }), T('ceilingPaint'), { normalScale: 0.35, aoMapIntensity: 0.4 }));
 
-  M.drywallCeilingKnockdown = withMaps(THREE, phys(THREE, {
+  def('drywallCeilingKnockdown', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.6,
-  }), T('drywallCeilingKnockdown'), { normalScale: 0.9, aoMapIntensity: 0.8 });
+  }), T('drywallCeilingKnockdown'), { normalScale: 0.9, aoMapIntensity: 0.8 }));
 
-  M.blackMatte = withMaps(THREE, phys(THREE, {
+  def('blackMatte', () => withMaps(THREE, phys(THREE, {
     metalness: 0.15,
     envMapIntensity: 0.6,
-  }), T('blackMatte'), { normalScale: 0.6 });
+  }), T('blackMatte'), { normalScale: 0.6 }));
 
   /* ------------------------------------------------------------ exterior */
 
-  M.grayLapSiding = withMaps(THREE, phys(THREE, {
+  def('grayLapSiding', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 1.0,
-  }), T('grayLapSiding'), { normalScale: 1.0, aoMapIntensity: 1.1 });
+  }), T('grayLapSiding'), { normalScale: 1.0, aoMapIntensity: 1.1 }));
 
-  M.asphaltShingle = withMaps(THREE, phys(THREE, {
+  def('asphaltShingle', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.85,
-  }), T('asphaltShingle'), { normalScale: 1.0, aoMapIntensity: 1.1 });
+  }), T('asphaltShingle'), { normalScale: 1.0, aoMapIntensity: 1.1 }));
 
-  M.lawnGrass = withMaps(THREE, phys(THREE, {
+  // The mower stripes live in the texture's macroscopic tilt, so the normal
+  // map must be applied at full strength or the stripes flatten out.
+  def('lawnGrass', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
-    sheen: 0.35,
-    sheenRoughness: 0.8,
-    sheenColor: new THREE.Color(0x9dbb63),
+    sheen: 0.45,
+    sheenRoughness: 0.75,
+    sheenColor: new THREE.Color(0xb7c98a),
     envMapIntensity: 0.95,
-  }), T('lawnGrass'), { normalScale: 0.9 });
+  }), T('lawnGrass'), { normalScale: 1.0, aoMapIntensity: 0.8 }));
 
-  M.mulchBed = withMaps(THREE, phys(THREE, {
+  def('mulchBed', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.7,
-  }), T('mulchBed'), { normalScale: 1.0, aoMapIntensity: 1.2 });
+  }), T('mulchBed'), { normalScale: 1.0, aoMapIntensity: 1.2 }));
 
   /* ---------------------------------------------- metals / fabric / glass */
 
-  M.stainlessBrushed = withMaps(THREE, phys(THREE, {
+  def('stainlessBrushed', () => withMaps(THREE, phys(THREE, {
     color: 0xffffff,
     metalness: 1.0,
     envMapIntensity: 1.35,
-  }), T('stainlessBrushed'), { normalScale: 0.55, aoMapIntensity: 0.3 });
+  }), T('stainlessBrushed'), { normalScale: 0.55, aoMapIntensity: 0.3 }));
 
-  M.brassBrushed = withMaps(THREE, phys(THREE, {
+  def('brassBrushed', () => withMaps(THREE, phys(THREE, {
     color: 0xffffff,
     metalness: 1.0,
     envMapIntensity: 1.3,
-  }), T('brassBrushed'), { normalScale: 0.5, aoMapIntensity: 0.3 });
+  }), T('brassBrushed'), { normalScale: 0.5, aoMapIntensity: 0.3 }));
 
-  M.fabricLinen = withMaps(THREE, phys(THREE, {
+  def('fabricLinen', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     sheen: 0.8,
     sheenRoughness: 0.75,
     sheenColor: new THREE.Color(0xe6ddcd),
     envMapIntensity: 0.6,
-  }), T('fabricLinen'), { normalScale: 1.0, aoMapIntensity: 1.0 });
+  }), T('fabricLinen'), { normalScale: 1.0, aoMapIntensity: 1.0 }));
 
-  M.fabricVelvet = withMaps(THREE, phys(THREE, {
+  def('fabricVelvet', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     sheen: 1.0,
     sheenRoughness: 0.35,
     sheenColor: new THREE.Color(0x9fb4c2),
     envMapIntensity: 0.6,
-  }), T('fabricVelvet'), { normalScale: 0.5, aoMapIntensity: 0.7 });
+  }), T('fabricVelvet'), { normalScale: 0.5, aoMapIntensity: 0.7 }));
 
-  M.leatherDark = withMaps(THREE, phys(THREE, {
+  def('leatherDark', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     clearcoat: 0.28,
     clearcoatRoughness: 0.5,
     sheen: 0.25,
     sheenRoughness: 0.6,
     envMapIntensity: 0.8,
-  }), T('leatherDark'), { normalScale: 1.0, aoMapIntensity: 1.0 });
+  }), T('leatherDark'), { normalScale: 1.0, aoMapIntensity: 1.0 }));
 
-  M.mirrorGlass = withMaps(THREE, phys(THREE, {
+  def('mirrorGlass', () => withMaps(THREE, phys(THREE, {
     color: 0xf6f8f8,
     metalness: 1.0,
     roughness: 0.02,
     envMapIntensity: 1.6,
-  }), T('mirrorGlass'), { normalScale: 0.15, roughnessMap: false, aoMap: false });
+  }), T('mirrorGlass'), { normalScale: 0.15, roughnessMap: false, aoMap: false }));
 
-  M.frostedGlass = withMaps(THREE, phys(THREE, {
+  def('frostedGlass', () => withMaps(THREE, phys(THREE, {
     color: 0xffffff,
     metalness: 0.0,
     transmission: 0.86,
@@ -372,9 +444,10 @@ export function makeMaterials(THREE, opts = {}) {
     ior: 1.5,
     envMapIntensity: 1.0,
     transparent: true,
-  }), T('frostedGlass'), { normalScale: 0.35, aoMap: false });
+  }), T('frostedGlass'), { normalScale: 0.35, aoMap: false }));
 
-  M.clearGlass = phys(THREE, {
+  def('clearGlass', () => {
+    const _m = phys(THREE, {
     color: 0xffffff,
     metalness: 0.0,
     roughness: 0.03,
@@ -386,21 +459,31 @@ export function makeMaterials(THREE, opts = {}) {
     transparent: true,
     side: THREE.DoubleSide,
   });
-  M.clearGlass.userData.scaleFeet = [3, 3];
-  M.clearGlass.userData.textureName = 'clearGlass';
+    _m.userData.scaleFeet = [3, 3];
+    _m.userData.textureName = 'clearGlass';
+    return _m;
+  });
 
   /* ------------------------------------------------------------ metadata */
 
-  for (const k of Object.keys(M)) {
-    M[k].name = k;
-    if (!M[k].userData.scaleFeet) M[k].userData.scaleFeet = [1, 1];
-  }
-
   Object.defineProperty(M, '__textures', { value: tex, enumerable: false });
   Object.defineProperty(M, '__quality', { value: quality, enumerable: false });
+  Object.defineProperty(M, '__names', { value: Object.freeze([...THUNKS.keys()]), enumerable: false });
+  /** Names of the materials actually built so far — for diagnostics. */
+  Object.defineProperty(M, '__built', { value: () => [...BUILT.keys()], enumerable: false });
+  /** Force-build the whole library (contact sheets, cache warming). */
+  Object.defineProperty(M, '__all', {
+    value() {
+      const out = {};
+      for (const k of THUNKS.keys()) out[k] = M[k];
+      return out;
+    },
+    enumerable: false,
+  });
   Object.defineProperty(M, 'dispose', {
     value() {
-      for (const k of Object.keys(M)) M[k].dispose();
+      for (const m of BUILT.values()) m.dispose();
+      BUILT.clear();
       for (const m of CLONE_CACHE.values()) m.dispose();
       CLONE_CACHE.clear();
       tex.dispose();

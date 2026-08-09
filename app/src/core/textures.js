@@ -5,13 +5,20 @@
  * ---------------------------------
  * - 1 world unit = 1 foot.  Every texture declares `scaleFeet = [u, v]`, the
  *   real-world size in FEET that one full 0..1 UV tile covers.  Nothing in this
- *   file is "arbitrary tiling": a red-oak strip really is 2.25" wide.
+ *   file is "arbitrary tiling": a red-oak strip really is 3.25" wide.
  * - No network assets, no binaries.  Everything is drawn into a <canvas> from
  *   seeded noise, so the same build always yields the same pixels.
  * - Each entry returns a texture SET:
- *       { map, normalMap, roughnessMap, aoMap, [metalnessMap], scaleFeet, size }
+ *       { map, normalMap, roughnessMap, aoMap,
+ *         [metalnessMap], [anisotropyMap], scaleFeet, size }
  *   `map` is SRGBColorSpace; every data map is NoColorSpace.  All are
  *   RepeatWrapping (except slabs flagged `clamp`) with anisotropy 8.
+ * - DIRECTIONAL surfaces (satin-poly floors, carpet nap, mown grass) may also
+ *   emit `anisotropyMap` (KHR_materials_anisotropy: RG = groove direction,
+ *   B = strength) and a `tiltU`/`tiltV` field.  The tilt is a MACROSCOPIC
+ *   surface orientation added to the sobel normal — carpet pile combed one
+ *   way, mower blades laid over — not a bump, so it must not be differentiated
+ *   out of the height field.
  * - Normal maps are DERIVED from the generated height field with a sobel
  *   operator, scaled by the texture's physical relief depth (`reliefFt`) and the
  *   texel footprint, so bump strength is physically consistent at every scale.
@@ -48,7 +55,14 @@
  *    whole floor reads as ripples, which is the fastest way to fail the blind
  *    test.
  * 4. RESTRAINT IN PALETTE.  Real finishes come from one mill / one dye lot.
- *    Wide random palettes read as patchwork laminate.
+ *    Wide random palettes read as patchwork laminate.  Calibrate the ALBEDO
+ *    mean against the matching listing-photo crop (the red-oak atlas measures
+ *    180/148/108, the photo's floor 181/143/109) before touching contrast.
+ * 5. MODEL THE CAUSE, NOT THE LOOK.  The figure of a plain-sawn board is the
+ *    intersection of cylindrical growth rings with a plane; a mower stripe is
+ *    grass bent two ways; a quartz vein is a contour, not a threshold.  Every
+ *    one of those got dramatically better the moment it was written as its own
+ *    geometry instead of as stacked sine waves.
  *
  * Grain axes: redOakFloor / lightPlankFloor / butcherBlock / compositeDeck /
  * sunroomDeckSlat run along +U.  cherryCabinet* and woodSlatWall run along +V.
@@ -115,12 +129,23 @@ function scaleRGB(c, k) {
 
 const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
 
+// 256-entry unit-gradient table.  Using a table instead of cos/sin per corner
+// makes perlin2 ~4x faster, which is what lets the hero floor be a 2048 atlas
+// with five noise fields per texel.  Determinism is unchanged (same seed ->
+// same index -> same gradient).
+const GRAD_COS = new Float32Array(256);
+const GRAD_SIN = new Float32Array(256);
+for (let i = 0; i < 256; i++) {
+  const a = (i + 0.5) * (Math.PI * 2 / 256);
+  GRAD_COS[i] = Math.cos(a);
+  GRAD_SIN[i] = Math.sin(a);
+}
+
 function pgrad(ix, iy, px, py, seed, dx, dy) {
   const wx = ((ix % px) + px) % px;
   const wy = ((iy % py) + py) % py;
-  const h = ihash(wx, wy, seed);
-  const a = (h & 65535) * (Math.PI * 2 / 65536);
-  return Math.cos(a) * dx + Math.sin(a) * dy;
+  const h = ihash(wx, wy, seed) & 255;
+  return GRAD_COS[h] * dx + GRAD_SIN[h] * dy;
 }
 
 /**
@@ -273,7 +298,7 @@ export function streak(src, size, rx, ry) {
  * Sobel height -> tangent-space normal RGBA (OpenGL green-up convention).
  * `sx`/`sy` are slope gains: reliefFeet / texelFeet along each axis.
  */
-function normalFromHeight(h, size, sx, sy) {
+function normalFromHeight(h, size, sx, sy, tiltU, tiltV) {
   const out = new Uint8ClampedArray(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
@@ -286,6 +311,11 @@ function normalFromHeight(h, size, sx, sy) {
       const gy = (dl + 2 * d + dr) - (ul + 2 * u + ur);
       let nx = gx * 0.125 * sx;
       let ny = gy * 0.125 * sy;
+      // A *macroscopic* tilt that is not part of the height field: mown grass
+      // blades laid over, carpet nap combed one way.  These are real surface
+      // orientations, not bumps, so they must not be differentiated from h.
+      if (tiltU) nx += tiltU[y * size + x];
+      if (tiltV) ny += tiltV[y * size + x];
       const nz = 1;
       const inv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
       nx *= inv; ny *= inv;
@@ -355,6 +385,29 @@ function canvasFromScalar(f, size) {
   return c;
 }
 
+/**
+ * Pack an anisotropy map: RG = the tangent-space direction of the microfacet
+ * grooves encoded as (dir*0.5+0.5), B = strength.  This is the glTF
+ * KHR_materials_anisotropy layout that MeshPhysicalMaterial.anisotropyMap
+ * consumes, and it is what makes a satin-poly floor smear its highlight ALONG
+ * the boards instead of blooming isotropically.
+ */
+function canvasFromAniso(str, ang, size) {
+  const c = newCanvas(size);
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const d = img.data;
+  for (let i = 0; i < size * size; i++) {
+    const a = ang ? ang[i] : 0;
+    d[i * 4] = to255(Math.cos(a) * 0.5 + 0.5);
+    d[i * 4 + 1] = to255(Math.sin(a) * 0.5 + 0.5);
+    d[i * 4 + 2] = to255(str[i]);
+    d[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
 function canvasFromRGBA(bytes, size) {
   const c = newCanvas(size);
   const ctx = c.getContext('2d');
@@ -387,7 +440,7 @@ function pack(name, spec) {
   const relief = spec.reliefFt === undefined ? 0.002 : spec.reliefFt;
   const sx = relief / (fu / size);
   const sy = relief / (fv / size);
-  const nrm = normalFromHeight(spec.hgt, size, sx, sy);
+  const nrm = normalFromHeight(spec.hgt, size, sx, sy, spec.tiltU, spec.tiltV);
   const ao = cavityAO(
     spec.hgt, size,
     spec.aoStrength === undefined ? 1.4 : spec.aoStrength,
@@ -404,6 +457,9 @@ function pack(name, spec) {
     aoMap: makeTex(canvasFromScalar(ao, size), false, spec.clamp),
   };
   if (spec.met) set.metalnessMap = makeTex(canvasFromScalar(spec.met, size), false, spec.clamp);
+  if (spec.anisoStr) {
+    set.anisotropyMap = makeTex(canvasFromAniso(spec.anisoStr, spec.anisoAng, size), false, spec.clamp);
+  }
   return set;
 }
 
@@ -493,119 +549,248 @@ function boardGrain(base, r) {
   });
 }
 
-const OAK_GRAIN = {
-  rings: 2.6, ringWidth: 0.042, warpFU: 5, warpFV: 2, warpAmp: 1.85,
-  fineFU: 10, fineFV: 200, fineAmt: 0.22,
-  poreFU: 340, poreFV: 170, poreThresh: 0.22, poreAmt: 0.75,
-  fleckFU: 40, fleckFV: 26, fleckAmt: 0.14,
-};
-
 /* ======================================================================== */
 /* 7. Generators                                                             */
 /* ======================================================================== */
 
 /* ---------------------------------------------------------- red oak floor */
 /**
- * 2.25" site-finished red oak strip, satin polyurethane.
- * Tile: 6.0 ft along the strips x 2.25 ft across = 12 strips.
+ * 3-1/4" site-finished red oak strip, natural (unstained), satin polyurethane.
+ * THE hero surface: it is in almost every first-floor photograph.
+ *
+ * Tile: 12.0 ft of board run x 16 strips (4.333 ft) across.
+ *
+ * THE FIGURE IS GEOMETRY, NOT SINE WAVES.  A log's growth rings are cylinders
+ * about the pith.  A plain-sawn board's face is a plane at distance D from that
+ * axis, so the ring phase at a point on the face is
+ *
+ *      phase = ringsPerInch * sqrt( (x - x0)^2 + D^2 )
+ *
+ * with `x` the across-board position in INCHES.  D and x0 wander slowly along
+ * the board, because no log is straight and no saw cut is parallel to the pith.
+ * That single equation produces, in the correct proportions and without any
+ * extra tuning:
+ *
+ *   - wide open CATHEDRAL arches wherever the wander brings D near zero,
+ *   - the nested-V figure of one arch inside the next,
+ *   - the fine, dense, near-parallel stripe that crowds the edges of the board
+ *     (large |x-x0| -> phase ~ |x-x0| -> full ringsPerInch spacing),
+ *   - and the smooth transition between the two along one board.
+ *
+ * Layered on top: the earlywood pore band (red oak's open pores, as short dark
+ * ticks just after each ring boundary), ray fleck, per-board colour lottery
+ * (some boards distinctly pink, some blond, some carrying a mineral streak),
+ * a hairline seam at each strip, tight butt joints on a staggered layout, and
+ * an ANISOTROPIC satin-poly sheen streaked along the boards.
  */
 function genRedOakFloor(size) {
-  const TU = 6.0, TV = 2.25, STRIP = 2.25 / 12;
-  const rows = Math.round(TV / STRIP); // 12
+  const STRIP = 3.25 / 12;            // 3-1/4" face
+  const rows = 14;
+  const TV = STRIP * rows;            // 3.7917 ft across
+  const TU = 11.0;                    // 11 ft of board run
   const s = blank(size, [TU, TV]);
   const rng = mulberry32(0x0a11ce);
 
-  // A finished floor is one species from one mill: tone varies, but only a
-  // little.  Wide random palettes read as patchwork laminate.
-  const tones = [
-    hexRGB('#b28a5c'), hexRGB('#ab8457'), hexRGB('#b79063'), hexRGB('#a67f53'),
-    hexRGB('#b58d60'), hexRGB('#b0885a'),
+  /* --- one mill, one dye lot: the spread is in figure and value, not hue --- */
+  const AMBER = [
+    hexRGB('#c4a374'), hexRGB('#bf9d6f'), hexRGB('#c9a97b'), hexRGB('#bb9769'),
+    hexRGB('#c2a172'), hexRGB('#c6a678'),
   ];
+  const PINK = [hexRGB('#c39a73'), hexRGB('#bf946e'), hexRGB('#c69e78')];
+  const BLOND = [hexRGB('#cdb289'), hexRGB('#d0b68e'), hexRGB('#c9ad83')];
 
-  // Board layout: each strip row is cut into 2-3 boards summing exactly to TU
-  // (so end joints land on the tile seam and the texture stays tileable).
+  /* --- board layout: 3-4 boards per 12 ft row, ends staggered ------------ */
   const rowsData = [];
   for (let r = 0; r < rows; r++) {
-    const k = 2 + (rng() < 0.45 ? 1 : 0);
+    const k = 3 + ((rng() * 2) | 0);          // 3 or 4 boards -> 3-4 ft average
     const lens = [];
     let sum = 0;
-    for (let i = 0; i < k; i++) { const L = 0.75 + rng() * 0.9; lens.push(L); sum += L; }
-    const cuts = [0];
+    for (let i = 0; i < k; i++) { const L = 0.62 + rng() * 0.95; lens.push(L); sum += L; }
+    // rotate the cut list by a random phase so joints never line up row to row
+    const rot = rng() * TU;
+    const cuts = new Float64Array(k);
     let acc = 0;
-    for (let i = 0; i < k; i++) { acc += (lens[i] / sum) * TU; cuts.push(acc); }
-    cuts[k] = TU;
+    for (let i = 0; i < k; i++) { cuts[i] = (acc + rot) % TU; acc += (lens[i] / sum) * TU; }
+    cuts.sort();
     const boards = [];
     for (let i = 0; i < k; i++) {
+      const lot = rng();
+      const tone = lot < 0.17 ? PINK[(rng() * PINK.length) | 0]
+        : lot < 0.32 ? BLOND[(rng() * BLOND.length) | 0]
+          : AMBER[(rng() * AMBER.length) | 0];
       boards.push({
-        u0: cuts[i], u1: cuts[i + 1],
-        tone: tones[(rng() * tones.length) | 0],
-        light: 0.94 + rng() * 0.125,
+        tone,
+        light: 0.950 + rng() * 0.110,         // board-to-board value spread
+        cool: 0.985 + rng() * 0.055,          // blue-channel trim (pink <-> neutral)
         seed: (rng() * 100000) | 0,
-        sat: 0.965 + rng() * 0.07,
-        cfg: boardGrain(OAK_GRAIN, rng()),
+        // Pith geometry, in inches.  `Dmin` is how close the pith comes to
+        // the face and `Damp` how much it wanders; both are small, because a
+        // 3-1/4" strip is sawn close to the pith plane and its rings therefore
+        // run mostly LENGTHWISE, flaring into a cathedral only where the pith
+        // rises toward the face.  `x0` is where the flare sits across the
+        // board: inside the face for a cathedral board, well outside it for a
+        // rift/straight-grain board (roughly half the boards in the photos).
+        Dmin: 0.03 + rng() * 0.22,
+        Damp: 0.35 + rng() * 1.15,
+        x0: rng() < 0.55 ? (rng() - 0.5) * 3.0 : (rng() < 0.5 ? -1 : 1) * (2.0 + rng() * 5.0),
+        xw: 0.30 + rng() * 0.95,
+        rpi: 6.0 + rng() * 4.0,               // 6-10 growth rings per inch
+        lateW: 0.26 + rng() * 0.14,           // latewood share of a ring
+        contrast: 0.19 + rng() * 0.20,
+        poreAmt: 0.50 + rng() * 0.40,
+        mineral: rng() < 0.16 ? 0.4 + rng() * 0.45 : 0,
+        rough: -0.02 + rng() * 0.05,
       });
     }
-    rowsData.push(boards);
+    // per-x board index + distance to the nearest butt joint (circular)
+    const idx = new Int32Array(size);
+    const jd = new Float32Array(size);
+    for (let x = 0; x < size; x++) {
+      const u = ((x + 0.5) / size) * TU;
+      let j = k - 1;
+      for (let q = 0; q < k; q++) if (u >= cuts[q]) j = q;
+      idx[x] = j;
+      let best = 1e9;
+      for (let q = 0; q < k; q++) {
+        let d = Math.abs(u - cuts[q]);
+        if (d > TU * 0.5) d = TU - d;
+        if (d < best) best = d;
+      }
+      jd[x] = best;
+    }
+    rowsData.push({ boards, idx, jd });
   }
 
-  const grout = hexRGB('#7a5a3a');
-  const bevelW = 0.030;           // fraction of strip width
-  const endW = 0.0035;            // feet
+  /* --- satin-poly sheen: long streaks smeared ALONG the boards ----------- */
+  const n = size * size;
+  const raw = new Float32Array(n);
+  for (let y = 0; y < size; y++) {
+    const v01 = (y + 0.5) / size;
+    for (let x = 0; x < size; x++) {
+      const u01 = (x + 0.5) / size;
+      raw[y * size + x] = fbmT(u01, v01, 3, 22, 3, 0x5ee, 0.62) * 0.5 + 0.5;
+    }
+  }
+  const sheenF = streak(raw, size, Math.max(2, Math.round(size * 0.035)), 0);
+  const buffRaw = new Float32Array(n);
+  for (let y = 0; y < size; y++) {
+    const v01 = (y + 0.5) / size;
+    for (let x = 0; x < size; x++) {
+      const u01 = (x + 0.5) / size;
+      buffRaw[y * size + x] = fbmT(u01, v01, 6, 190, 2, 0x8ee) * 0.5 + 0.5;
+    }
+  }
+  const buffF = streak(buffRaw, size, Math.max(3, Math.round(size * 0.05)), 0);
+
+  s.anisoStr = new Float32Array(n);
+
+  // across-board inches covered by one texel — drives the ring antialiasing
+  const DXI_PER_PX = 3.25 * rows / size;
+  const seam = hexRGB('#96754f');
+  const joint = hexRGB('#7d5f42');
+  const bevelFt = 0.0030;             // ~1/32" eased top edge, both sides
+  const jointFt = 0.0055;             // tight butt joint, ~1/16" of visible line
 
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
     const v = v01 * TV;
     const row = Math.min(rows - 1, Math.floor(v / STRIP));
-    const t = (v - row * STRIP) / STRIP;
-    const boards = rowsData[row];
+    const t = (v - row * STRIP) / STRIP;      // 0..1 across one strip
+    const rd = rowsData[row];
+    const edgeFt = Math.min(t, 1 - t) * STRIP;
+    const bev = smoothstep(0, bevelFt, edgeFt);
+    const xi0 = (t - 0.5) * 3.25;             // across-board position, inches
+
     for (let x = 0; x < size; x++) {
       const u01 = (x + 0.5) / size;
-      const u = u01 * TU;
-      let b = boards[boards.length - 1];
-      for (let i = 0; i < boards.length; i++) {
-        if (u >= boards[i].u0 && u < boards[i].u1) { b = boards[i]; break; }
-      }
       const i = y * size + x;
+      const b = rd.boards[rd.idx[x]];
+      const sd = b.seed;
 
-      const g = woodGrain(u01, v01, t, b.seed, b.cfg);
+      /* -------- pith geometry -> ring phase --------
+         The pith wanders along the board at ~2 ft per cycle, which is what
+         sets the LENGTH of one cathedral flare; the photographs show flares
+         roughly a foot long on a 3-1/4" face, with tight near-parallel grain
+         in between where the pith has receded. */
+      const q = clamp01(0.5 + 0.5 * (fbmT(u01, v01, 7, 1, 3, sd) * 0.80
+        + fbmT(u01, v01, 18, 2, 2, sd + 811) * 0.30));
+      const D = b.Dmin + b.Damp * q;
+      const xa = b.x0 + b.xw * fbmT(u01, v01, 9, 1, 2, sd + 1117);
+      const dx = xi0 - xa;
+      const rad = Math.sqrt(dx * dx + D * D);
+      let phase = b.rpi * rad;
+      // the rings themselves are not perfect circles
+      phase += fbmT(u01, v01, 6, 90, 2, sd + 31) * 0.34
+        + fbmT(u01, v01, 2, 14, 2, sd + 47) * 0.30;
+      const f = phase - Math.floor(phase);
 
-      // base colour with per-board tone / lightness / warmth
+      /* -------- one growth ring: pale porous earlywood ramping into dense
+         dark latewood, then a hard boundary back to the next ring.
+         The latewood line keeps a roughly constant PHYSICAL width, so where
+         the rings splay open at an arch apex the dark band does not balloon
+         into a lens: `g` is the ring's obliquity to the face. */
+      const g = Math.abs(dx) / rad;
+      let w = b.lateW * (0.30 + 0.70 * g);
+      // Analytic antialiasing.  Where the rings crowd below ~3 texels the line
+      // is widened and proportionally lightened, so it fades into an even
+      // darkening instead of breaking into moire (see NYQUIST, top of file).
+      const wMin = Math.min(0.46, 1.5 * b.rpi * g * DXI_PER_PX);
+      const aa = w >= wMin ? 1 : w / wMin;
+      if (w < wMin) w = wMin;
+      const ring = smoothstep(1 - w, 1 - w * 0.25, f) * aa;
+      const band = smoothstep(0.18, 1 - w, f) * 0.26;    // the tonal ramp
+      const early = 1 - smoothstep(0.0, 0.40, f);        // pore zone
+      // not every growth ring is equally dark
+      const ringK = 0.55 + 0.55 * (0.5 + 0.5 * fbmT(u01, v01, 4, 34, 2, sd + 55));
+
+      /* -------- open pores: short dark ticks in the earlywood band ------- */
+      const poreN = fbmT(u01, v01, 420, 150, 2, sd + 913);
+      const pore = smoothstep(0.02, 0.30, poreN) * early * b.poreAmt;
+
+      /* -------- ray fleck: pale slashes lying across the grain ----------- */
+      const fl = fbmT(u01, v01, 26, 90, 2, sd + 1777);
+      const fleck = smoothstep(0.30, 0.66, fl) * 0.09;
+
+      /* -------- colour -------- */
       let c = scaleRGB(b.tone, b.light);
-      c = [c[0], c[1] * mix(1.0, 0.985, 1 - b.sat), c[2] * b.sat];
-      // large slow colour drift within a board
-      const drift = fbmT(u01, v01, 4, 3, 3, b.seed + 5) * 0.075;
-      c = scaleRGB(c, 1 + drift);
-      // Broad ring band first (this is the cathedral figure you see from 10 ft),
-      // then the thin latewood line, then pores and rays.
-      c = scaleRGB(c, 1 - g.band * 0.21);
-      c = scaleRGB(c, 1 - g.ring * 0.30);
-      c = mixRGB(c, scaleRGB(c, 0.62), g.pore * 0.42);
-      c = mixRGB(c, scaleRGB(c, 1.08), g.fleck);
+      c = [c[0], c[1], c[2] * b.cool];
+      // slow tonal drift down the length of the board
+      c = scaleRGB(c, 1 + fbmT(u01, v01, 3, 2, 3, sd + 5) * 0.050
+        + fbmT(u01, v01, 9, 7, 2, sd + 9) * 0.030);
+      c = scaleRGB(c, 1 + early * 0.014 * g - band * b.contrast * 0.70);
+      // the latewood line is warm dark brown, never neutral
+      const k = 1 - b.contrast * 1.45 * ringK;
+      c = mixRGB(c, [c[0] * k, c[1] * k * 0.955, c[2] * k * 0.90], ring);
+      c = mixRGB(c, scaleRGB(c, 0.70), pore * 0.55);
+      c = mixRGB(c, scaleRGB(c, 1.06), fleck);
+      if (b.mineral) {
+        const mn = smoothstep(0.58, 0.92, fbmT(u01, v01, 4, 30, 3, sd + 77));
+        c = mixRGB(c, [c[0] * 0.62, c[1] * 0.60, c[2] * 0.63], mn * b.mineral);
+      }
 
-      // relief: pores and latewood sit a hair below the finish film
-      let h = 0.55 - g.pore * 0.55 - g.ring * 0.10;
+      /* -------- relief: only the pores and the ring valleys ------------- */
+      let h = 0.62 - pore * 0.55 - ring * 0.12;
 
-      // micro-bevel at strip seams
-      const e = Math.min(t, 1 - t) / bevelW;
-      const bev = smoothstep(0, 1, Math.min(1, e));
-      h *= 0.35 + 0.65 * bev;
-      c = mixRGB(grout, c, 0.58 + 0.42 * bev);
+      /* -------- strip seam + butt joint -------- */
+      h *= 0.30 + 0.70 * bev;
+      c = mixRGB(seam, c, 0.34 + 0.66 * bev);
+      const ej = smoothstep(0, jointFt, rd.jd[x]);
+      h *= 0.34 + 0.66 * ej;
+      c = mixRGB(joint, c, 0.40 + 0.60 * ej);
 
-      // butt joints between boards
-      const de = Math.min(u - b.u0, b.u1 - u);
-      const ej = smoothstep(0, endW, de);
-      h *= 0.4 + 0.6 * ej;
-      c = mixRGB(scaleRGB(grout, 0.85), c, 0.55 + 0.45 * ej);
-
-      // satin poly: mostly smooth, slightly duller in the open pores
-      let r = 0.20 + g.pore * 0.22 + fbmT(u01, v01, 12, 6, 3, 991) * 0.045;
-      r = mix(0.62, r, bev * ej);
+      /* -------- satin poly, streaked along the boards ------------------- */
+      const sh = sheenF[i], bf = buffF[i];
+      let r = 0.285 + b.rough + (sh - 0.5) * 0.11 + (bf - 0.5) * 0.05
+        + pore * 0.16 + ring * 0.02;
+      r = mix(0.55, r, bev * ej);
       setPx(s, i, c, h, clamp01(r));
+      // the poly film's micro-grooves run with the boards (+U)
+      s.anisoStr[i] = clamp01(0.72 + (sh - 0.5) * 0.5) * bev * ej;
     }
   }
-  s.reliefFt = 0.00040;
-  s.aoStrength = 0.35;
-  s.aoRadius = 0.010;
+  s.reliefFt = 0.00042;
+  s.aoStrength = 0.30;
+  s.aoRadius = 0.008;
   return s;
 }
 
@@ -679,59 +864,132 @@ function genLightPlankFloor(size) {
 }
 
 /* --------------------------------------------------------- quartz (white) */
-function quartzField(size, TU, TV, seedBase, bookMatch, veinAmt) {
+/**
+ * Calacatta-look engineered quartz (the counters AND the full-height slab
+ * backsplash — one product, one slab lot).
+ *
+ * What the photographs actually show (`kitchen_view_1`, `kitchen_view_3`):
+ * a near-white, very slightly warm field carrying THIN, wispy, branching grey
+ * veins that run in long diagonal sweeps.  Individual veins are hairline —
+ * about 1-3 mm — and they FADE: one stretch of a vein reads mid-grey, twenty
+ * inches later the same vein is barely there.  Each strong vein trails a much
+ * wider, much fainter grey shadow, because the pigment is suspended a
+ * millimetre or two BELOW the polished surface and the resin scatters it.
+ * Around and between them run finer capillaries at a third the width.
+ *
+ * So the field is built as four superimposed layers, each with its own
+ * frequency, width, colour and — critically — its own low-frequency OPACITY
+ * mask, rather than as one thresholded ridged-noise blob.
+ */
+
+/**
+ * One vein.  A vein is the ZERO CONTOUR of a smooth noise field, not the ridge
+ * of a threshold: that is what makes it a long, continuous, wandering line
+ * that forks and rejoins instead of a chain of blobs.  `w` is the half-width
+ * of the core in noise units; the same distance field gives the wide soft
+ * halo for free.
+ */
+function veinLine(u, v, fu, fv, seed, w) {
+  const n = noiseT(u, v, fu, fv, seed)
+    + 0.26 * noiseT(u, v, fu * 3, fv * 3, seed + 7)
+    + 0.07 * noiseT(u, v, fu * 8, fv * 8, seed + 13);
+  const d = Math.abs(n);
+  return {
+    core: 1 - smoothstep(w * 0.30, w, d),
+    halo: 1 - smoothstep(w, w * 7, d),
+  };
+}
+
+function quartzField(size, TU, TV, seedBase, opts) {
+  const o = opts || {};
   const s = blank(size, [TU, TV]);
   const base = hexRGB('#f4f3f0');
-  const warm = hexRGB('#efece5');
-  const vein = hexRGB('#93999f');
-  const veinSoft = hexRGB('#d5d7d7');
+  const warm = hexRGB('#eeebe3');
+  const veinDark = hexRGB('#7b828a');
+  const veinMid = hexRGB('#9ba1a7');
+  const veinPale = hexRGB('#c8ccce');
+  const amt = o.veinAmt === undefined ? 1 : o.veinAmt;
+  // Slab veins sweep diagonally, so the noise domain is sheared, not isotropic.
+  const SH = o.shear === undefined ? 0.42 : o.shear;
 
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
     for (let x = 0; x < size; x++) {
-      let u01 = (x + 0.5) / size;
-      if (bookMatch) u01 = u01 < 0.5 ? u01 * 2 : (1 - u01) * 2; // mirrored slab halves
+      const u01 = (x + 0.5) / size;
       const i = y * size + x;
+      const du = u01 + v01 * SH;
+      const dv = v01 - u01 * SH * 0.25;
 
-      // domain-warped ridged noise = branching marble veining.
-      // The vein field is stretched diagonally so veins run in long sweeps
-      // rather than isotropic blobs, exactly like a book-matched quartz slab.
-      const w = warpT(u01, v01, 2, 3, 0.30, seedBase + 3);
-      const du = w[0] * 0.55 + w[1] * 0.30;
-      const dv = w[1] * 1.00 - w[0] * 0.12;
-      const primary = ridgedT(du, dv, 2, 3, 5, seedBase, 0.58);
-      const secondary = ridgedT(du * 1.0, dv * 1.0, 4, 7, 4, seedBase + 101, 0.5);
+      // one shared domain warp: it is what makes the veins wander
+      const w = warpT(du, dv, 2, 3, 0.16, seedBase + 3);
+      const uu = w[0], vv = w[1];
 
-      const vMain = smoothstep(0.795, 0.965, primary);
-      const vHalo = smoothstep(0.52, 0.88, primary) * 0.62;
-      const vFine = smoothstep(0.80, 0.985, secondary) * 0.70;
+      const L1 = veinLine(uu, vv, 2, 3, seedBase, 0.030);
+      const L2 = veinLine(uu, vv, 3, 5, seedBase + 51, 0.020);
+      const L3 = veinLine(uu, vv, 6, 9, seedBase + 91, 0.013);
+      const L4 = veinLine(uu, vv, 11, 16, seedBase + 131, 0.009);
 
-      let c = mixRGB(base, warm, 0.5 + 0.5 * fbmT(u01, v01, 2, 2, 3, seedBase + 77));
-      c = mixRGB(c, veinSoft, clamp01((vHalo * 0.55 + vFine * 0.45) * veinAmt));
-      c = mixRGB(c, vein, clamp01(vMain * veinAmt));
-      // very fine crystalline speckle
+      // Opacity masks.  A real vein does not run at constant strength: it
+      // surfaces, fades to nothing, and comes back a foot later.
+      const mk = fbmT(u01, v01, 3, 3, 3, seedBase + 201);
+      const m1 = 0.10 + 0.90 * smoothstep(-0.50, 0.35, mk);
+      const m2 = 0.08 + 0.92 * smoothstep(0.35, -0.50, mk);
+      const m3 = 0.12 + 0.88 * smoothstep(-0.45, 0.45,
+        fbmT(u01, v01, 5, 5, 2, seedBase + 307));
+
+      let c = mixRGB(base, warm, 0.5 + 0.5 * fbmT(u01, v01, 2, 2, 2, seedBase + 77));
+      // haloes first — the pigment is suspended a millimetre UNDER the polish,
+      // and the resin scatters it into a much wider, much fainter shadow.
+      // Without this the veins read as ink printed on the surface.
+      c = mixRGB(c, veinPale, clamp01((L1.halo * 0.34 * m1 + L2.halo * 0.20 * m2
+        + L3.halo * 0.10 * m3) * amt));
+      c = mixRGB(c, veinMid, clamp01((L4.core * 0.13 * m3 + L3.core * 0.22 * m3) * amt));
+      c = mixRGB(c, veinMid, clamp01(L2.core * 0.46 * m2 * amt));
+      c = mixRGB(c, veinDark, clamp01(L1.core * 0.80 * m1 * amt));
+      // fine crystalline speckle in the resin
       const sp = fbmT(u01, v01, 300, 300, 2, seedBase + 55);
-      c = scaleRGB(c, 1 + sp * 0.022);
+      c = scaleRGB(c, 1 + sp * 0.016);
 
-      // polished: veins are a touch less glossy than the field
-      const r = 0.055 + vMain * 0.045 + Math.max(0, sp) * 0.02;
-      const h = 0.5 + vMain * 0.06 - vFine * 0.02;
+      const vAll = clamp01(L1.core * m1 + L2.core * 0.7 * m2 + L3.core * 0.5 * m3);
+      const r = 0.050 + vAll * 0.035 + Math.max(0, sp) * 0.015;
+      // relief is essentially nil — a polished slab is flat to the touch
+      const h = 0.5 + vAll * 0.05;
       setPx(s, i, c, h, r);
     }
   }
-  s.reliefFt = 0.00045;
-  s.aoStrength = 0.35;
+  s.reliefFt = 0.00022;
+  s.aoStrength = 0.25;
   return s;
 }
 
+/** Counters and island: a 6 ft x 6 ft repeat of the slab. */
 function genQuartzWhite(size) {
-  const s = quartzField(size, 6, 6, 4211, false, 1.0);
-  return s;
+  return quartzField(size, 6, 6, 4211, { veinAmt: 1.0, shear: 0.42 });
 }
 
-/** Continuous book-matched slab for the full-height backsplash. */
+/**
+ * The full-height slab backsplash.  This one does NOT tile: `clamp` is set and
+ * `applyUV` maps 0..1 across the whole wall, so the veining runs unbroken from
+ * the counter to the underside of the uppers exactly as in `kitchen_view_1`.
+ * Same seed family, same shear and the same 6 ft vein pitch as `quartzWhite`,
+ * so the wall reads as the next slab off the same block — book-matched with
+ * the counter across the caulk joint rather than a different stone.
+ */
 function genQuartzSlabBacksplash(size) {
-  const s = quartzField(size, 10, 7, 9137, true, 1.25);
+  // 10 ft wide x 5 ft high piece of the SAME slab, mirrored top-to-bottom so
+  // the veins that arrive at the counter line continue out of it.
+  const s = quartzField(size, 10, 5, 4211, { veinAmt: 1.10, shear: 0.42 });
+  // vertical mirror = the book-match fold at the counter seam
+  const half = size >> 1;
+  for (let y = 0; y < half; y++) {
+    const y2 = size - 1 - y;
+    for (let x = 0; x < size; x++) {
+      const a = y * size + x, b = y2 * size + x;
+      for (let k = 0; k < 3; k++) { const t = s.alb[a * 3 + k]; s.alb[a * 3 + k] = s.alb[b * 3 + k]; s.alb[b * 3 + k] = t; }
+      let t = s.hgt[a]; s.hgt[a] = s.hgt[b]; s.hgt[b] = t;
+      t = s.rgh[a]; s.rgh[a] = s.rgh[b]; s.rgh[b] = t;
+    }
+  }
   s.clamp = true;
   return s;
 }
@@ -993,21 +1251,36 @@ function genBlackBacker(size) {
 
 /* --------------------------------------------------- bronze porcelain tile */
 /**
- * Primary bath: 12"x24" metallic bronze/brown large-format porcelain
- * (oxidised-iron look) laid in half bond.  Tile = 4 ft x 4 ft.
+ * Primary bath WALLS: 12"x24" metallic-look porcelain, half bond, thin joint.
+ *
+ * `master_bedroom_bathroom_view_1/2` at 4x show an oxidised-metal glaze, not a
+ * chocolate stone: each tile is horizontally STRATIFIED, as if a sheet of steel
+ * had rusted in bands.  The lot swings hard between two families — warm
+ * rust/copper tiles and cool blue-grey steel tiles frosted with pale mineral
+ * bloom — and adjacent tiles are often from opposite families.  Over the whole
+ * face runs a fine speckled mottling, and the glaze is glossy enough to hold a
+ * clear reflection of the tub.
+ *
+ * The two things the previous version got wrong were (a) isotropic blotches
+ * instead of horizontal strata and (b) no cool family at all, which is what
+ * made it read as flat chocolate.
  */
 function genBronzePorcelain(size) {
   const TW = 2.0, TH = 1.0;    // 24" x 12"
   const TU = 4.0, TV = 4.0;
   const s = blank(size, [TU, TV]);
-  const grout = hexRGB('#57483c');
-  const GW = 0.007;            // 1/16" rectified joint
+  const grout = hexRGB('#6f6055');
+  const GW = 0.006;            // ~1/16" rectified joint
 
-  const dark = hexRGB('#382c25');
-  const mid = hexRGB('#6b5240');
-  const warm = hexRGB('#8a6b4d');
-  const copper = hexRGB('#a58260');
-  const steel = hexRGB('#565049');
+  // warm family
+  const rust0 = hexRGB('#5b4234');
+  const rust1 = hexRGB('#8d6549');
+  const rust2 = hexRGB('#bc8f65');
+  // cool family
+  const steel0 = hexRGB('#4b4d4c');
+  const steel1 = hexRGB('#7c807e');
+  const steel2 = hexRGB('#a9aaa4');
+  const frost = hexRGB('#cfccc3');
   s.met = new Float32Array(size * size);
 
   for (let y = 0; y < size; y++) {
@@ -1019,59 +1292,80 @@ function genBronzePorcelain(size) {
       const i = y * size + x;
       const L = lattice(u, v, TW, TH, 0.5);
       if (L.edgeFt < GW) {
-        const g = fbmT(u01, v01, 120, 120, 2, 55);
+        const g = fbmT(u01, v01, 150, 150, 2, 55);
         const e = smoothstep(0, GW, L.edgeFt);
-        const c = scaleRGB(grout, 0.9 + g * 0.16);
-        setPx(s, i, c, 0.06 + e * 0.10, clamp01(0.80 + g * 0.06));
+        const c = scaleRGB(grout, 0.92 + g * 0.16);
+        setPx(s, i, c, 0.10 + e * 0.14, clamp01(0.78 + g * 0.06));
         continue;
       }
-      // per-tile variation: rotate the sampling phase so no two tiles match
+      // per-tile sampling window: every tile is a different piece of the glaze
       const tk = ihash(L.i, L.j, 8821);
       const ph = (tk & 1023) / 1024;
       const flip = (tk >>> 12) & 1;
-      let su = L.lu, sv = L.lv;
-      if (flip) { su = 1 - su; }
-      const nu = (su * 0.5 + ph) % 1;
-      const nv = (sv * 0.25 + ((tk >>> 20) & 255) / 256) % 1;
+      let su = L.lu;
+      if (flip) su = 1 - su;
+      const nu = (su * 0.42 + ph) % 1;
+      const nv = (L.lv * 0.22 + ((tk >>> 20) & 255) / 256) % 1;
+      // which family is this tile from, and how strongly
+      const cool = ((tk >>> 6) & 255) / 255;
 
-      const w = warpT(nu, nv, 3, 3, 0.16, 991);
-      const cloud = fbmT(w[0], w[1], 3, 3, 5, 991) * 0.5 + 0.5;
-      const cloud2 = fbmT(w[0], w[1], 9, 9, 4, 1223) * 0.5 + 0.5;
-      const rust = ridgedT(w[0], w[1], 5, 5, 4, 1451, 0.55);
+      // HORIZONTAL STRATA: the noise is stretched ~15:1 across the tile
+      const w = warpT(nu, nv, 2, 10, 0.10, 991);
+      const strat = fbmT(w[0], w[1], 2, 22, 4, 991) * 0.5 + 0.5;
+      const strat2 = fbmT(w[0], w[1], 5, 54, 3, 1223) * 0.5 + 0.5;
+      const bloom = ridgedT(w[0], w[1], 3, 30, 4, 1451, 0.55);
+      const grit = fbmT(u01, v01, 340, 340, 2, 77);
+      const grit2 = fbmT(u01, v01, 110, 150, 2, 179);
 
-      let c = mixRGB(dark, mid, smoothstep(0.25, 0.75, cloud));
-      c = mixRGB(c, warm, smoothstep(0.45, 0.95, cloud2) * 0.75);
-      c = mixRGB(c, copper, smoothstep(0.82, 0.99, rust) * 0.45);
-      c = mixRGB(c, steel, smoothstep(0.15, 0.0, cloud) * 0.5);
+      let warmC = mixRGB(rust0, rust1, smoothstep(0.22, 0.80, strat));
+      warmC = mixRGB(warmC, rust2, smoothstep(0.55, 0.96, strat2) * 0.80);
+      let coolC = mixRGB(steel0, steel1, smoothstep(0.20, 0.82, strat));
+      coolC = mixRGB(coolC, steel2, smoothstep(0.50, 0.94, strat2) * 0.85);
+      coolC = mixRGB(coolC, frost, smoothstep(0.78, 1.0, bloom) * 0.60);
+
+      // The cool oxide does not own whole tiles: it appears as BANDS inside a
+      // tile, with the tile's own bias deciding how much of it there is.
+      const coolMix = smoothstep(0.36, 0.92, cool * 0.44 + strat * 0.34 + bloom * 0.34);
+      let c = mixRGB(warmC, coolC, coolMix);
+      // a warm copper bloom crosses even the cool bands
+      c = mixRGB(c, rust2, smoothstep(0.88, 1.0, bloom) * 0.35 * (1 - coolMix * 0.5));
       // whole-tile lightness lottery
-      c = scaleRGB(c, 0.86 + ((tk >>> 4) & 255) / 255 * 0.30);
-      // fine crystalline sparkle
-      const sp = fbmT(u01, v01, 400, 400, 2, 77);
-      c = scaleRGB(c, 1 + sp * 0.05);
+      c = scaleRGB(c, 0.90 + ((tk >>> 4) & 255) / 255 * 0.24);
+      // fine metallic sparkle and mineral pepper
+      c = scaleRGB(c, 1 + grit * 0.095 + grit2 * 0.06);
 
-      // glazed but mottled gloss — the signature of this tile
-      const r = clamp01(0.16 + (1 - smoothstep(0.3, 0.9, cloud2)) * 0.30 + rust * 0.14 + sp * 0.03);
-      const h = 0.55 + (cloud2 - 0.5) * 0.10 + sp * 0.05;
+      // Glazed and glossy, but mottled: the strata hold slightly different
+      // gloss, which is what makes the reflection of the tub break up.
+      const r = clamp01(0.10 + (1 - smoothstep(0.25, 0.92, strat2)) * 0.20
+        + bloom * 0.10 + grit * 0.04);
+      const h = 0.55 + (strat2 - 0.5) * 0.12 + grit * 0.06;
       setPx(s, i, c, h, r);
-      s.met[i] = clamp01(0.10 + smoothstep(0.6, 1.0, rust) * 0.35);
+      // a metallic-look glaze really does carry some conductor response
+      s.met[i] = clamp01(0.14 + smoothstep(0.55, 1.0, bloom) * 0.28 + coolMix * 0.12);
     }
   }
-  s.reliefFt = 0.006;
-  s.aoStrength = 2.2;
-  s.aoRadius = 0.016;
+  s.reliefFt = 0.0045;
+  s.aoStrength = 2.0;
+  s.aoRadius = 0.014;
   return s;
 }
 
-/** Primary bath FLOOR: same family, lighter tan-brown, 13" square. */
+/**
+ * Primary bath FLOOR: a DIFFERENT tile — 13" square, straight set, warm
+ * terracotta/rose-brown "slate look" with a dense salt-and-pepper mottle and
+ * clearly visible LIGHT tan grout at ~3/16".  Measured mean in the photo
+ * 180/158/143.  It must not read as the wall tile on the floor.
+ */
 function genBronzePorcelainFloor(size) {
   const TW = 13 / 12, TH = 13 / 12;
   const TU = TW * 4, TV = TH * 4;
   const s = blank(size, [TU, TV]);
-  const grout = hexRGB('#b6a189');
-  const GW = 0.014;
-  const dark = hexRGB('#6d5949');
-  const mid = hexRGB('#8f7c68');
-  const light = hexRGB('#ab9a86');
+  const grout = hexRGB('#cbb69d');
+  const GW = 0.0135;           // ~3/16" joint, half-width
+  const deep = hexRGB('#8a7365');
+  const mid = hexRGB('#b39a88');
+  const light = hexRGB('#d4c3b3');
+  const rose = hexRGB('#bfa38f');
 
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
@@ -1082,9 +1376,9 @@ function genBronzePorcelainFloor(size) {
       const i = y * size + x;
       const L = lattice(u, v, TW, TH, 0);
       if (L.edgeFt < GW) {
-        const g = fbmT(u01, v01, 120, 120, 2, 33);
+        const g = fbmT(u01, v01, 160, 160, 2, 33);
         const e = smoothstep(0, GW, L.edgeFt);
-        setPx(s, i, scaleRGB(grout, 0.94 + g * 0.12), 0.10 + e * 0.15, clamp01(0.85 + g * 0.05));
+        setPx(s, i, scaleRGB(grout, 0.95 + g * 0.10), 0.12 + e * 0.18, clamp01(0.88 + g * 0.05));
         continue;
       }
       const tk = ihash(L.i, L.j, 5533);
@@ -1093,22 +1387,36 @@ function genBronzePorcelainFloor(size) {
       let su = L.lu, sv = L.lv;
       if (rot & 1) { const t = su; su = sv; sv = t; }
       if (rot & 2) { su = 1 - su; }
-      const nu = (su * 0.28 + ph) % 1;
-      const nv = (sv * 0.28 + ((tk >>> 19) & 255) / 256) % 1;
+      const nu = (su * 0.30 + ph) % 1;
+      const nv = (sv * 0.30 + ((tk >>> 19) & 255) / 256) % 1;
 
-      const w = warpT(nu, nv, 4, 4, 0.13, 707);
-      const cloud = fbmT(w[0], w[1], 4, 4, 5, 707) * 0.5 + 0.5;
-      const mottle = fbmT(w[0], w[1], 14, 14, 4, 909) * 0.5 + 0.5;
-      let c = mixRGB(dark, mid, smoothstep(0.2, 0.8, cloud));
-      c = mixRGB(c, light, smoothstep(0.5, 0.95, mottle) * 0.7);
+      const w = warpT(nu, nv, 4, 4, 0.11, 707);
+      const cloud = fbmT(w[0], w[1], 3, 3, 4, 707) * 0.5 + 0.5;
+      const blotch = fbmT(w[0], w[1], 9, 9, 3, 313) * 0.5 + 0.5;
+      const vein = ridgedT(w[0], w[1], 8, 8, 3, 1313, 0.5);
+      // The signature of this product is a DENSE salt-and-pepper mottle at
+      // roughly 1/16", sitting under broad cloudy tone shifts.  The pepper is
+      // evaluated in TILE space (not per-tile) so it never repeats visibly.
+      const pep1 = fbmT(u01, v01, 170, 170, 3, 909) * 0.5 + 0.5;
+      const pep2 = fbmT(u01, v01, 480, 480, 2, 121) * 0.5 + 0.5;
+
+      let c = mixRGB(mid, deep, smoothstep(0.55, 0.02, cloud) * 0.9);
+      c = mixRGB(c, light, smoothstep(0.48, 0.96, cloud) * 0.85);
+      c = mixRGB(c, deep, smoothstep(0.50, 0.95, blotch) * 0.52);
+      c = mixRGB(c, light, smoothstep(0.46, 0.06, blotch) * 0.34);
+      c = mixRGB(c, rose, smoothstep(0.60, 0.95, vein) * 0.30);
+      // pepper: fine dark and pale specks over the whole face
+      c = scaleRGB(c, 1 - smoothstep(0.56, 0.92, pep1) * 0.24);
+      c = scaleRGB(c, 1 + smoothstep(0.44, 0.04, pep1) * 0.17);
+      c = scaleRGB(c, 1 + (pep2 - 0.5) * 0.16);
+      // tile-to-tile tone lottery (this product ships with a wide shade range)
       c = scaleRGB(c, 0.92 + ((tk >>> 3) & 255) / 255 * 0.17);
-      const sp = fbmT(u01, v01, 380, 380, 2, 121);
-      c = scaleRGB(c, 1 + sp * 0.04);
-      const r = clamp01(0.30 + (1 - mottle) * 0.16 + sp * 0.03);
-      setPx(s, i, c, 0.6 + (mottle - 0.5) * 0.08, r);
+
+      const r = clamp01(0.34 + (1 - cloud) * 0.14 + (pep2 - 0.5) * 0.08);
+      setPx(s, i, c, 0.6 + (pep1 - 0.5) * 0.30 + (pep2 - 0.5) * 0.24, r);
     }
   }
-  s.reliefFt = 0.008;
+  s.reliefFt = 0.006;
   s.aoStrength = 2.2;
   s.aoRadius = 0.016;
   return s;
@@ -1219,84 +1527,129 @@ function genMosaicAccent(size) {
 }
 
 /* ------------------------------------------------------------------ carpet */
-/** Basement: tan berber loop pile. */
-function genCarpetTan(size) {
-  const TU = 1.0, TV = 1.0;
+/**
+ * Broadloom carpet, built the way carpet actually looks in the photographs.
+ *
+ * `master_bedroom_1.png` and `basement_view_1.png` at 4x show NO woven
+ * checkerboard.  What they show is:
+ *   1. a dense field of fine fibre striations running in ONE direction — the
+ *      nap, combed by the last pass of the vacuum,
+ *   2. broad, very low-contrast value banding across that direction (the
+ *      vacuum tracks and foot traffic), with soft irregular edges,
+ *   3. a fine salt-and-pepper of individual yarn ends, at the very edge of
+ *      resolution, and
+ *   4. essentially no hue variation at all — chroma is 15-25 levels.
+ *
+ * The nap is what makes carpet read as carpet: it is a directional surface, so
+ * it gets a real anisotropy map (grooves along +U) and a slight normal tilt,
+ * on top of the sheen lobe.  Value changes with view angle, exactly as the
+ * banding in the photographs does.
+ */
+function carpetField(size, opts) {
+  const TU = opts.tile, TV = opts.tile;
   const s = blank(size, [TU, TV]);
-  const base = hexRGB('#c9b598');
-  const d2 = hexRGB('#9c8767');
-  const lite = hexRGB('#e3d6bd');
-  const LOOPS = 40; // ~0.3" berber loop pitch
+  const n = size * size;
+  const base = hexRGB(opts.base);
+  const dark = hexRGB(opts.dark);
+  const lite = hexRGB(opts.lite);
+
+  /* --- the nap: high-frequency fibre noise smeared along +U ------------- */
+  const raw = new Float32Array(n);
+  for (let y = 0; y < size; y++) {
+    const v01 = (y + 0.5) / size;
+    for (let x = 0; x < size; x++) {
+      const u01 = (x + 0.5) / size;
+      raw[y * size + x] = fbmT(u01, v01, opts.fibreU, opts.fibreV, 2, 6767, 0.65) * 0.5 + 0.5;
+    }
+  }
+  const nap = streak(raw, size, Math.max(1, Math.round(size * opts.smear)), 0);
+
+  s.anisoStr = new Float32Array(n);
+  s.tiltU = new Float32Array(n);
+
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
     for (let x = 0; x < size; x++) {
       const u01 = (x + 0.5) / size;
       const i = y * size + x;
-      // loop grid, jittered
-      const w = worleyT(u01, v01, LOOPS, Math.round(LOOPS * 0.86), 1234, 0.9);
-      const loop = 1 - smoothstep(0.02, 0.42, w.f1);
-      // alternating row height (berber has paired loops)
-      const rowMod = ((w.id >>> 5) & 3) === 0 ? 0.6 : 1.0;
-      // large cloudy shading from pile direction
-      const cloud = fbmT(u01, v01, 2, 2, 3, 4242) * 0.5 + 0.5;
-      const fiber = fbmT(u01, v01, 150, 70, 2, 88);
-      let c = mixRGB(d2, base, smoothstep(-0.15, 1.15, cloud));
-      c = mixRGB(c, lite, loop * 0.46 * rowMod);
-      c = scaleRGB(c, 1 + fiber * 0.09);
-      c = scaleRGB(c, 0.84 + loop * 0.30);
-      const h = loop * rowMod * 0.9 + fiber * 0.1;
-      setPx(s, i, c, clamp01(h), clamp01(0.86 - loop * 0.10 + fiber * 0.03));
+
+      /* --- vacuum / traffic banding: broad soft bands across the nap.
+         This is the feature that survives to room scale, so it carries most
+         of the carpet's read; the photographs show 10-15% value swings with
+         soft, wandering edges. */
+      const bandPhase = v01 * opts.bands + fbmT(u01, v01, 2, 2, 2, 5150) * 0.30;
+      const band = smoothstep(-0.62, 0.62, Math.sin(bandPhase * Math.PI * 2));
+      const drift = fbmT(u01, v01, 2, 3, 3, 8181) * 0.5 + 0.5;
+      const shade = clamp01(band * 0.60 + drift * 0.40);
+
+      /* --- individual yarn ends ---------------------------------------- */
+      const tuft = worleyT(u01, v01, opts.tuftU, opts.tuftV, 9393, 0.95);
+      const tip = 1 - smoothstep(0.06, 0.44, tuft.f1);
+      const tipVar = 0.55 + 0.45 * ((tuft.id >>> 9) & 1);
+
+      const nz = nap[i];
+      const pepper = fbmT(u01, v01, 300, 300, 2, 4242);
+
+      // loop/tuft rows: the pile is set in rows across the nap direction
+      const row = opts.rowAmt
+        ? (0.5 + 0.5 * Math.cos(v01 * opts.rows * Math.PI * 2)) * opts.rowAmt
+        : 0;
+
+      let c = mixRGB(dark, base, smoothstep(0.04, 0.96, shade));
+      c = mixRGB(c, lite, (nz - 0.42) * opts.napAmt);
+      c = scaleRGB(c, 1 + (nz - 0.5) * opts.napVal);
+      c = scaleRGB(c, 0.965 + tip * opts.tipAmt * tipVar);
+      c = scaleRGB(c, 1 + pepper * opts.pepper - row);
+
+      const h = tip * opts.tipH + nz * opts.napH + Math.max(0, pepper) * 0.10 - row * 2.0;
+      setPx(s, i, c, clamp01(h), clamp01(opts.rough - nz * 0.05 + pepper * 0.02));
+
+      // the pile leans with the nap: a real surface tilt, not a bump
+      s.tiltU[i] = opts.tilt * (0.6 + 0.8 * (shade - 0.5));
+      s.anisoStr[i] = clamp01(opts.aniso * (0.75 + 0.5 * nz));
     }
   }
-  s.reliefFt = 0.008;
-  s.aoStrength = 2.6;
+  s.reliefFt = opts.relief;
+  s.aoStrength = opts.ao;
   s.aoRadius = 0.02;
   return s;
 }
 
-/** Bedrooms: soft beige cut pile with vacuum shading. */
+/**
+ * Primary bedroom (`master_bedroom_1/2/3`): light greige CUT pile.  Softer,
+ * deeper and more obviously combed than the basement; the nap banding is the
+ * dominant read.  Measured mean in the photo 190/176/165 — a warm grey, NOT
+ * a tan, with only 25 levels of chroma.
+ */
+function genCarpetTan(size) {
+  return carpetField(size, {
+    tile: 2.0,
+    base: '#cfc3b4', dark: '#b7ab9c', lite: '#ded4c6',
+    fibreU: 8, fibreV: 155, smear: 0.012, bands: 1,
+    tuftU: 150, tuftV: 118,
+    napAmt: 0.30, napVal: 0.105, tipAmt: 0.055, pepper: 0.028,
+    rows: 0, rowAmt: 0,
+    tipH: 0.45, napH: 0.42, rough: 0.90,
+    relief: 0.010, ao: 2.2, tilt: 0.30, aniso: 0.60,
+  });
+}
+
+/**
+ * Basement rec room (`basement_view_1/3/4`): denser, flatter, slightly warmer
+ * loop pile.  Shorter pile means the yarn ends read as a much finer, tighter
+ * pepper and the nap banding is weaker.
+ */
 function genCarpetBeige(size) {
-  const TU = 1.5, TV = 1.5;
-  const s = blank(size, [TU, TV]);
-  const base = hexRGB('#ded0ba');
-  const dark = hexRGB('#c3b299');
-  const lite = hexRGB('#ece1cd');
-  // build a fiber field then streak it so tufts read as directional
-  const n = size * size;
-  const f = new Float32Array(n);
-  for (let y = 0; y < size; y++) {
-    const v01 = (y + 0.5) / size;
-    for (let x = 0; x < size; x++) {
-      const u01 = (x + 0.5) / size;
-      f[y * size + x] = fbmT(u01, v01, 105, 58, 3, 6767, 0.62) * 0.5 + 0.5;
-    }
-  }
-  const streaked = streak(f, size, Math.max(1, Math.round(size * 0.004)), 0);
-  for (let y = 0; y < size; y++) {
-    const v01 = (y + 0.5) / size;
-    for (let x = 0; x < size; x++) {
-      const u01 = (x + 0.5) / size;
-      const i = y * size + x;
-      const tuft = streaked[i];
-      const cloud = fbmT(u01, v01, 2, 2, 4, 8181) * 0.5 + 0.5;
-      const nap = fbmT(u01, v01, 5, 7, 3, 9191) * 0.5 + 0.5;
-      const tick = fbmT(u01, v01, 140, 74, 2, 9292) * 0.5 + 0.5;
-      // discrete tuft tips: a jittered grid of yarn ends catching the light
-      const tuftCell = worleyT(u01, v01, 96, 78, 9393, 0.95);
-      const tip = 1 - smoothstep(0.05, 0.46, tuftCell.f1);
-      let c = mixRGB(dark, base, smoothstep(0.15, 0.95, cloud));
-      c = mixRGB(c, lite, smoothstep(0.4, 0.9, nap) * 0.45);
-      c = scaleRGB(c, 0.76 + tuft * 0.42);
-      c = scaleRGB(c, 0.93 + tick * 0.14);
-      c = scaleRGB(c, 0.90 + tip * 0.24 * (0.5 + 0.5 * ((tuftCell.id >>> 9) & 1)));
-      const h = tip * 0.55 + tuft * 0.30 + tick * 0.12 + cloud * 0.03;
-      setPx(s, i, c, clamp01(h), clamp01(0.90 - tuft * 0.06));
-    }
-  }
-  s.reliefFt = 0.012;
-  s.aoStrength = 3.0;
-  s.aoRadius = 0.02;
-  return s;
+  return carpetField(size, {
+    tile: 2.0,
+    base: '#c6b39c', dark: '#ab9884', lite: '#d8c8b2',
+    fibreU: 10, fibreV: 230, smear: 0.007, bands: 2,
+    tuftU: 240, tuftV: 190,
+    napAmt: 0.22, napVal: 0.085, tipAmt: 0.085, pepper: 0.040,
+    rows: 168, rowAmt: 0.030,
+    tipH: 0.55, napH: 0.30, rough: 0.93,
+    relief: 0.0065, ao: 2.6, tilt: 0.16, aniso: 0.40,
+  });
 }
 
 /* ------------------------------------------------------------ rubber gym */
@@ -1360,16 +1713,45 @@ function genBlackGranite(size) {
 }
 
 /* --------------------------------------------------------- gray lap siding */
-/** 8" exposure weathered gray cedar lap siding.  Tile = 4 ft x 4 courses. */
+/**
+ * Weathered silvery-gray stained cedar lap siding, 7.5" exposure.
+ *
+ * `straight_on_view_of_house_from_street.png` at 6x is unambiguous about three
+ * things the first pass missed:
+ *   1. it is LIGHT — a shaded course measures 142/147/154, i.e. a mid-light
+ *      silver that is faintly COOL, not a dark olive grey;
+ *   2. the wood GRAIN reads straight through the semi-transparent stain as
+ *      long, fine, high-contrast streaks running the length of each board;
+ *   3. board-to-board tone varies visibly — some courses are a full 12%
+ *      lighter than their neighbours, and a few have weathered browner.
+ * The butt of every course throws a crisp dark shadow line onto the course
+ * below, which is the strongest single feature at facade distance.
+ */
 function genGrayLapSiding(size) {
-  const EXP = 8 / 12;
-  const courses = 4;
-  const TU = 4.0, TV = EXP * courses;
+  const EXP = 7.5 / 12;
+  const courses = 6;
+  const TU = 8.0, TV = EXP * courses;
   const s = blank(size, [TU, TV]);
   const rng = mulberry32(0x51d1);
-  const tones = [hexRGB('#7b7d76'), hexRGB('#73756e'), hexRGB('#82847c'), hexRGB('#6c6e68')];
+  const tones = [
+    hexRGB('#9b9d9c'), hexRGB('#94979a'), hexRGB('#a1a29f'), hexRGB('#8d9194'),
+    hexRGB('#9fa09b'), hexRGB('#979996'),
+  ];
+  const brown = hexRGB('#9a9188');       // a few boards weathered warmer
   const rowTone = [];
-  for (let i = 0; i < courses; i++) rowTone.push({ c: tones[(rng() * 4) | 0], k: 0.94 + rng() * 0.12, seed: (rng() * 1e5) | 0 });
+  for (let i = 0; i < courses; i++) {
+    rowTone.push({
+      c: tones[(rng() * tones.length) | 0],
+      k: 0.935 + rng() * 0.13,
+      warm: rng() < 0.30 ? 0.18 + rng() * 0.22 : 0,
+      seed: (rng() * 1e5) | 0,
+      // each board is a different piece of cedar
+      grainF: 150 + ((rng() * 130) | 0),
+      grainA: 0.10 + rng() * 0.08,
+      // butt joint position along the run
+      joint: rng(),
+    });
+  }
 
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
@@ -1380,31 +1762,35 @@ function genGrayLapSiding(size) {
     for (let x = 0; x < size; x++) {
       const u01 = (x + 0.5) / size;
       const i = y * size + x;
-      // rough-sawn cedar: horizontal grain + weathering streaks
-      const grain = fbmT(u01, v01, 9, 150, 3, rt.seed);
-      const saw = fbmT(u01, v01, 5, 190, 2, rt.seed + 13);
-      const weather = fbmT(u01, v01, 90, 5, 3, 4141);
-      let c = scaleRGB(rt.c, rt.k * (1 + grain * 0.085 + saw * 0.04));
-      c = scaleRGB(c, 1 + weather * 0.06);
-      c = mixRGB(c, [0.42, 0.43, 0.41], smoothstep(0.55, 1.0, weather) * 0.18);
+      // rough-sawn cedar: long fine grain streaks + slow weathering blotches
+      const grain = fbmT(u01, v01, 7, rt.grainF, 3, rt.seed);
+      const saw = fbmT(u01, v01, 4, rt.grainF * 2, 2, rt.seed + 13);
+      const weather = fbmT(u01, v01, 40, 6, 3, 4141);
+      const lichen = fbmT(u01, v01, 14, 4, 3, 4242);
+      let c = scaleRGB(rt.c, rt.k * (1 + grain * rt.grainA + saw * 0.045));
+      if (rt.warm) c = mixRGB(c, brown, rt.warm);
+      c = scaleRGB(c, 1 + weather * 0.05);
+      c = mixRGB(c, [0.46, 0.47, 0.46], smoothstep(0.50, 1.0, lichen) * 0.14);
+      // the stain has faded most on the exposed lower part of each board
+      c = scaleRGB(c, 0.985 + t * 0.030);
 
       // board profile: thin at the top, thick at the butt, deep shadow below
       let h = 0.25 + 0.75 * t;
       let shade = 1;
-      if (t < 0.14) {                     // shadow cast by the course above
-        const k = 1 - t / 0.14;
-        shade = 1 - k * k * 0.72;
+      if (t < 0.12) {                     // shadow cast by the course above
+        const k = 1 - t / 0.12;
+        shade = 1 - k * k * 0.66;
         h = mix(0.0, h, 1 - k * 0.95);
       }
-      // occasional vertical butt joint between siding boards
-      const bj = Math.abs(((u01 + row * 0.37) % 1) - 0.5);
-      if (bj > 0.4988) { shade *= 0.75; h *= 0.55; }
+      // vertical butt joint between siding boards, with its caulk line
+      const bj = Math.abs(((u01 + rt.joint) % 1) - 0.5);
+      if (bj > 0.4975) { shade *= 0.72; h *= 0.5; }
       c = scaleRGB(c, shade);
-      const r = clamp01(0.68 + grain * 0.08 + weather * 0.05);
+      const r = clamp01(0.72 + grain * 0.07 + weather * 0.04);
       setPx(s, i, c, clamp01(h), r);
     }
   }
-  s.reliefFt = 0.05;
+  s.reliefFt = 0.045;
   s.aoStrength = 2.0;
   s.aoRadius = 0.02;
   return s;
@@ -1681,43 +2067,87 @@ function genSunroomDeckSlat(size) {
 }
 
 /* -------------------------------------------------------------- lawn grass */
-/** Fescue/bluegrass lawn with 4 ft mower stripes running along +U. */
+/**
+ * Fescue/bluegrass lawn with real MOWER STRIPES.
+ *
+ * A mower stripe is not a paint stripe: it is the SAME grass with the blades
+ * bent in opposite directions by successive passes of the roller.  A band
+ * mown away from you shows the backs of the blades and reads pale; the band
+ * beside it shows the tips and reads dark.  So the stripe is modelled as an
+ * alternating surface TILT (through `tiltU`, which is a genuine macroscopic
+ * normal, not a bump) plus the albedo consequence, and it therefore changes
+ * with the camera exactly as the stripes in
+ * `straight_on_view_of_house_from_street.png` do.
+ *
+ * The other thing the photographs insist on is tonal RANGE: the front lawn
+ * runs from deep shaded green through mid green to straw-yellow thin patches
+ * within a few feet, and it is clumpy — the blades grow in tufts with visible
+ * gaps, not as a uniform felt.
+ */
 function genLawnGrass(size) {
-  const TU = 8.0, TV = 8.0;
+  const TU = 12.0, TV = 12.0;
   const s = blank(size, [TU, TV]);
-  const dark = hexRGB('#37502b');
-  const mid = hexRGB('#4a6f36');
-  const lite = hexRGB('#658a45');
-  const dry = hexRGB('#8a8f55');
+  const n = size * size;
+  // Sunlit turf in these photographs measures R 132-139 / G 141-148 /
+  // B 90-104 — a yellow-green that is far LESS saturated than the green a
+  // procedural lawn reaches for.  R/G is about 0.94, not 0.7.
+  const shade = hexRGB('#4a5c36');
+  const deep = hexRGB('#647a45');
+  const mid = hexRGB('#7e9455');
+  const lite = hexRGB('#9cae6b');
+  const straw = hexRGB('#a8a067');
+  const thatch = hexRGB('#7d7048');
+
+  s.tiltU = new Float32Array(n);
+
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
     for (let x = 0; x < size; x++) {
       const u01 = (x + 0.5) / size;
       const i = y * size + x;
-      // blades: two crossed anisotropic fields
-      // warp the blade field so the fibres wander instead of forming a weave
-      const wb = warpT(u01, v01, 10, 10, 0.020, 1011);
-      const b1 = fbmT(wb[0], wb[1], 30, 150, 2, 1010);
-      const bl = worleyT(wb[0], wb[1], 130, 44, 2020, 1);
-      const b2 = (1 - smoothstep(0.05, 0.6, bl.f1)) * 2 - 1;
-      const clump = fbmT(u01, v01, 14, 14, 3, 3030);
-      const patch = fbmT(u01, v01, 3, 3, 3, 4040);
-      // mower stripes: 2 stripes per 8 ft tile => 4 ft each, soft edges
-      const stripePhase = v01 * 2;
-      const sq = Math.sin(stripePhase * Math.PI * 2);
-      const stripe = smoothstep(-0.55, 0.55, sq);
-      let c = mixRGB(dark, mid, smoothstep(-0.75, 0.85, clump));
-      c = mixRGB(c, lite, smoothstep(-0.15, 0.75, b1) * 0.62);
-      c = mixRGB(c, dry, smoothstep(0.45, 1.0, patch) * 0.22);
-      // laid-over blades reflect more light in one stripe
-      c = scaleRGB(c, mix(0.80, 1.18, stripe));
-      c = scaleRGB(c, 1 + b2 * 0.12);
-      const h = 0.5 + b1 * 0.3 + b2 * 0.2 + clump * 0.2;
-      setPx(s, i, c, clamp01(h), clamp01(0.78 - stripe * 0.10 + clump * 0.05));
+
+      /* --- mower stripes: 3 bands per 12 ft tile = 4 ft each ------------ */
+      const edge = fbmT(u01, v01, 3, 2, 2, 6161) * 0.06;   // the roller wanders
+      const sp = (v01 + edge) * 3;
+      const sq = Math.sin(sp * Math.PI * 2);
+      const stripe = smoothstep(-0.30, 0.30, sq);          // 0 = away, 1 = toward
+      const lay = stripe * 2 - 1;                          // -1..1 lay direction
+
+      /* --- blades: a fine anisotropic field whose direction FLIPS with the
+         stripe, so the two bands are combed opposite ways ---------------- */
+      const bw = warpT(u01, v01, 12, 12, 0.016, 1011);
+      const bladeA = fbmT(bw[0] + bw[1] * 0.20, bw[1], 90, 620, 2, 1010);
+      const bladeB = fbmT(bw[0] - bw[1] * 0.20, bw[1], 90, 620, 2, 2020);
+      const blade = mix(bladeA, bladeB, stripe);
+
+      /* --- clumps and bare/thin patches --------------------------------- */
+      const clump = worleyT(u01, v01, 104, 104, 3030, 1);
+      const tuft = 1 - smoothstep(0.14, 0.58, clump.f1);
+      const patch = fbmT(u01, v01, 2, 2, 3, 4040) * 0.5 + 0.5;
+      const patch2 = fbmT(u01, v01, 5, 5, 3, 4141) * 0.5 + 0.5;
+      const dry = smoothstep(0.62, 0.98, patch * 0.6 + patch2 * 0.5);
+      const rich = smoothstep(0.58, 0.10, patch * 0.55 + patch2 * 0.55);
+
+      let c = mixRGB(deep, mid, smoothstep(0.15, 0.85, patch2));
+      c = mixRGB(c, lite, smoothstep(-0.25, 0.60, blade) * 0.70);
+      c = mixRGB(c, deep, smoothstep(-0.15, -0.65, blade) * 0.45);
+      c = mixRGB(c, shade, rich * 0.55);
+      c = mixRGB(c, straw, dry * 0.72);
+      // thatch showing between the tufts
+      c = mixRGB(c, thatch, (1 - tuft) * 0.16);
+      // the bent blades of one stripe throw more light back
+      c = scaleRGB(c, mix(0.88, 1.12, stripe));
+      c = scaleRGB(c, 0.945 + tuft * 0.11);
+
+      const h = 0.45 + tuft * 0.24 + blade * 0.34 + (patch2 - 0.5) * 0.16;
+      setPx(s, i, c, clamp01(h), clamp01(0.80 - stripe * 0.10 + (1 - tuft) * 0.05));
+      // the actual lay of the blades — this is what makes the stripe survive
+      // a change of viewpoint
+      s.tiltU[i] = lay * 0.55;
     }
   }
-  s.reliefFt = 0.012;
-  s.aoStrength = 1.4;
+  s.reliefFt = 0.020;
+  s.aoStrength = 1.6;
   return s;
 }
 
@@ -1951,10 +2381,10 @@ function genFrostedGlass(size) {
 
 const REG = {
   /* --- floors --- */
-  redOakFloor: { hero: true, gen: genRedOakFloor, scaleFeet: [6, 2.25], note: '2.25" red oak strip, satin poly. Grain runs along +U.' },
+  redOakFloor: { hero: true, gen: genRedOakFloor, scaleFeet: [11, 3.25 / 12 * 14], note: '3-1/4" natural red oak strip, satin poly, anisotropic sheen. 14-board x 11 ft atlas. Grain runs along +U.' },
   lightPlankFloor: { hero: false, gen: genLightPlankFloor, scaleFeet: [6, 7 / 12 * 4], note: '7" gray-beige LVP plank, matte. Grain along +U.' },
-  carpetTan: { hero: false, gen: genCarpetTan, scaleFeet: [1, 1], note: 'Basement tan berber loop.' },
-  carpetBeige: { hero: false, gen: genCarpetBeige, scaleFeet: [1.5, 1.5], note: 'Bedroom beige cut pile.' },
+  carpetTan: { hero: true, gen: genCarpetTan, scaleFeet: [2, 2], note: 'Primary bedroom greige CUT pile: directional nap + vacuum banding. Nap runs along +U.' },
+  carpetBeige: { hero: true, gen: genCarpetBeige, scaleFeet: [2, 2], note: 'Basement/second-floor beige LOOP pile: denser and flatter than carpetTan. Nap along +U.' },
   rubberGymFloor: { hero: false, gen: genRubberGymFloor, scaleFeet: [2, 2], note: 'Charcoal flecked rubber gym flooring.' },
   sunroomDeckSlat: { hero: false, gen: genSunroomDeckSlat, scaleFeet: [4, (2 / 12 + 0.55 / 12) * 8], note: 'Dark 2" slat deck, sunroom / indoor patio.' },
   compositeDeck: { hero: false, gen: genCompositeDeck, scaleFeet: [6, (5.5 / 12 + 0.22 / 12) * 4], note: 'Gray composite decking, 5.5" boards.' },
@@ -1989,9 +2419,9 @@ const REG = {
   blackMatte: { hero: false, gen: genBlackMatte, scaleFeet: [1.5, 1.5], note: 'Matte black hardware / fixtures.' },
 
   /* --- exterior --- */
-  grayLapSiding: { hero: false, gen: genGrayLapSiding, scaleFeet: [4, 8 / 12 * 4], note: 'Weathered gray cedar lap siding, 8" exposure.' },
+  grayLapSiding: { hero: true, gen: genGrayLapSiding, scaleFeet: [8, 7.5 / 12 * 6], note: 'Weathered silvery-gray cedar lap siding, 7.5" exposure, grain through the stain.' },
   asphaltShingle: { hero: false, gen: genAsphaltShingle, scaleFeet: [3, 5.5 / 12 * 4], note: 'Charcoal architectural shingle, 5.5" exposure.' },
-  lawnGrass: { hero: false, gen: genLawnGrass, scaleFeet: [8, 8], note: 'Lawn with 4 ft mower stripes running along +U.' },
+  lawnGrass: { hero: true, gen: genLawnGrass, scaleFeet: [12, 12], note: 'Lawn: 4 ft mower stripes running along +U, real alternating blade lay, clumpy with straw patches.' },
   mulchBed: { hero: false, gen: genMulchBed, scaleFeet: [3, 3], note: 'Dark shredded hardwood mulch.' },
 
   /* --- metals, fabrics, glass --- */

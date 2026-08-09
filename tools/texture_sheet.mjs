@@ -34,6 +34,9 @@ const ONLY = arg('--only', '');
 // --detail renders a few textures BIG (one 4 ft x 4 ft swatch per cell) so the
 // grain / weave / tile scale can actually be judged against the listing photos.
 const DETAIL = arg('--detail', '');
+// --swatch overrides the detail swatch size in FEET (default 4).  Use a small
+// value (1.5-2) to inspect grain / weave at photo magnification.
+const SWATCH = Number(arg('--swatch', '4')) || 4;
 const OUT = path.join(
   ROOT, 'renders',
   DETAIL ? (arg('--out', '_textures_detail.png')) : '_textures.png'
@@ -91,7 +94,7 @@ async function run() {
   await page.goto(`${base}/__sheet.html`, { waitUntil: 'load' });
 
   const t0 = Date.now();
-  const dataUrl = await page.evaluate(async ({ quality, only, detail }) => {
+  const dataUrl = await page.evaluate(async ({ quality, only, detail, swatchFt }) => {
     const THREE = await import('three');
     const texMod = await import('/app/src/core/textures.js');
     const matMod = await import('/app/src/core/materials.js');
@@ -157,10 +160,10 @@ async function run() {
     scene.add(fill);
 
     const camera = new THREE.PerspectiveCamera(detail ? 20 : 24, CW / CH, 0.1, 100);
-    camera.position.set(0, 0, detail ? 13.5 : 15.5);
+    camera.position.set(0, 0, detail ? 13.5 * (swatchFt / 4) : 15.5);
     camera.lookAt(0, 0, 0);
 
-    const SWATCH_FT = detail ? 4 : 3;
+    const SWATCH_FT = detail ? swatchFt : 3;
     const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.5, 96, 64), null);
     const swatch = new THREE.Mesh(new THREE.PlaneGeometry(SWATCH_FT, SWATCH_FT), null);
     if (detail) {
@@ -225,7 +228,7 @@ async function run() {
     }
 
     return sheet.toDataURL('image/png');
-  }, { quality: QUALITY, only: ONLY, detail: DETAIL });
+  }, { quality: QUALITY, only: ONLY, detail: DETAIL, swatchFt: SWATCH });
 
   console.log(`  render took ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   await browser.close();
