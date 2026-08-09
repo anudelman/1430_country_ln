@@ -150,6 +150,9 @@ void main() {
  * @param {number} [o.sunElevation=46]   degrees above horizon
  * @param {number} [o.turbidity=2.6]     1 = arctic clear, 10 = summer smog
  * @param {number} [o.intensity=1.0]     master multiplier on the whole sky
+ * @param {number} [o.radianceScale=1.25] absolute brightness anchor: puts the
+ *        zenith at ~0.6 and the horizon at ~1.0 linear, which is the ratio a
+ *        listing photo shows between open sky and a sunlit white wall
  * @param {number|THREE.Color} [o.groundColor=0x5c5a4e]
  * @param {number} [o.sunDisc=55]        disc radiance multiplier
  * @param {number} [o.resolution]        PMREM cube size; defaults per quality
@@ -165,6 +168,7 @@ export function makeSkyEnv(renderer, {
   sunElevation = 46,
   turbidity = 2.6,
   intensity = 1.0,
+  radianceScale = 1.25,
   groundColor = 0x5c5a4e,
   sunDisc = 55,
   resolution,
@@ -181,22 +185,23 @@ export function makeSkyEnv(renderer, {
   const paleness = clamp((turbidity - 1) / 9, 0, 1);
   const elevF = clamp(sunElevation / 60, 0, 1);
 
+  const K = radianceScale;
   const zenith = new THREE.Color().setRGB(
-    THREE.MathUtils.lerp(0.075, 0.30, paleness) * THREE.MathUtils.lerp(0.55, 1.0, elevF),
-    THREE.MathUtils.lerp(0.185, 0.36, paleness) * THREE.MathUtils.lerp(0.60, 1.0, elevF),
-    THREE.MathUtils.lerp(0.480, 0.62, paleness) * THREE.MathUtils.lerp(0.75, 1.0, elevF),
+    K * THREE.MathUtils.lerp(0.075, 0.30, paleness) * THREE.MathUtils.lerp(0.55, 1.0, elevF),
+    K * THREE.MathUtils.lerp(0.185, 0.36, paleness) * THREE.MathUtils.lerp(0.60, 1.0, elevF),
+    K * THREE.MathUtils.lerp(0.480, 0.62, paleness) * THREE.MathUtils.lerp(0.75, 1.0, elevF),
     THREE.LinearSRGBColorSpace
   );
   const horizon = new THREE.Color().setRGB(
-    THREE.MathUtils.lerp(0.62, 0.90, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[0]),
-    THREE.MathUtils.lerp(0.68, 0.90, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[1]),
-    THREE.MathUtils.lerp(0.80, 0.94, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[2]),
+    K * THREE.MathUtils.lerp(0.62, 0.90, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[0]),
+    K * THREE.MathUtils.lerp(0.68, 0.90, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[1]),
+    K * THREE.MathUtils.lerp(0.80, 0.94, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[2]),
     THREE.LinearSRGBColorSpace
   );
   const sunColor = new THREE.Color().setRGB(
     trans.rgb[0], trans.rgb[1], trans.rgb[2], THREE.LinearSRGBColorSpace
   );
-  const ground = new THREE.Color(groundColor).convertSRGBToLinear().multiplyScalar(0.55);
+  const ground = new THREE.Color(groundColor).convertSRGBToLinear().multiplyScalar(0.55 * K);
 
   const uniforms = {
     uZenith: { value: zenith },
@@ -204,7 +209,7 @@ export function makeSkyEnv(renderer, {
     uGround: { value: ground },
     uSunColor: { value: sunColor },
     uSunDir: { value: dir.clone() },
-    uSunDisc: { value: sunDisc * trans.attenuation },
+    uSunDisc: { value: sunDisc * trans.attenuation * K },
     uSunAngular: { value: 1.6 * DEG },
     uGlow: { value: 0.30 },
     uGlowPower: { value: 70.0 },
@@ -238,12 +243,22 @@ export function makeSkyEnv(renderer, {
   envTexture.name = 'skyEnv';
 
   /* ---- the visible backdrop ------------------------------------------- */
-  const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(skyRadius, 48, 24), material);
+  // Unit sphere: onBeforeRender re-centres it on the camera and scales it to
+  // sit just inside the far plane, so the backdrop can never be clipped away
+  // no matter what `far` a preset uses.
+  const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), material);
   skyMesh.name = 'sky';
   skyMesh.frustumCulled = false;
   skyMesh.renderOrder = -1000;
-  skyMesh.matrixAutoUpdate = false;
-  skyMesh.updateMatrix();
+  skyMesh.userData.maxRadius = skyRadius;
+  skyMesh.onBeforeRender = function (rnd, scn, cam) {
+    // onBeforeRender runs before three computes modelViewMatrix, so updating
+    // matrixWorld here is picked up by this very draw call.
+    const r = Math.min(skyMesh.userData.maxRadius, (cam.far || 1000) * 0.48);
+    this.position.copy(cam.position);
+    this.scale.setScalar(r);
+    this.updateMatrixWorld(true);
+  };
 
   captureScene.remove(capture);
   capture.geometry.dispose();
@@ -326,9 +341,16 @@ void main() {
  * @param {number|string|THREE.Color} [o.ceilingColor=0xffffff]
  * @param {number|string|THREE.Color} [o.windowColor=0xdce7f5]
  * @param {number} [o.intensity=1.0]      master multiplier
- * @param {number} [o.ceilingBoost=1.35]  fixtures on
- * @param {number} [o.floorFactor=0.42]
- * @param {number} [o.windowIntensity=1.6] 0 disables the window lobe
+ * @param {number} [o.ceilingBoost=0.45]  fixtures on
+ * @param {number} [o.floorFactor=0.15]
+ * @param {number} [o.windowIntensity=0.80] 0 disables the window lobe
+ *
+ * The absolute level is a compromise the whole project depends on: the map is
+ * BOTH the indirect-diffuse source and the specular reflection source. Set to
+ * the true radiance of a lit room (~0.4) it double-counts against
+ * bakeAmbientFill; set to a pure bounce fraction, chrome and brass go dead.
+ * These numbers sit between the two — raise them and lower `fill.intensity`
+ * together if a room needs livelier metal.
  * @param {number[]} [o.windowDir=[0,0,-1]] horizontal direction of the glass
  * @param {number} [o.windowTight=2.2]
  * @param {number} [o.resolution]
@@ -341,10 +363,10 @@ export function makeIndoorEnv(renderer, {
   ceilingColor = 0xffffff,
   windowColor = 0xdce7f5,
   intensity = 1.0,
-  ceilingBoost = 1.35,
-  wallFactor = 0.78,
-  floorFactor = 0.42,
-  windowIntensity = 1.6,
+  ceilingBoost = 0.45,
+  wallFactor = 0.30,
+  floorFactor = 0.15,
+  windowIntensity = 0.80,
   windowDir = [0, 0, -1],
   windowTight = 2.2,
   resolution,
