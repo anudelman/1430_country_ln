@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-09T21:57:39.928Z",
+  "updated": "2026-08-10T03:23:16.802Z",
   "house": "1430 Country Ln",
   "photoDir": "listing_photos",
   "renderDir": "renders",
@@ -16,13 +16,13 @@
         "listing_photos/front_leftside_of_house.png",
         "listing_photos/front_rightside_of_house.png"
       ],
-      "round": 0,
+      "round": 1,
       "verdict": "PENDING",
       "confidence": null,
       "gap": "",
       "history": [],
       "notes": [],
-      "renderStamp": 0
+      "renderStamp": 1786332159282
     },
     {
       "id": "exterior-entry",

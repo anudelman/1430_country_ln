@@ -4985,6 +4985,477 @@ export function makeKit(THREE, mat, tex) {
   }
 
   /* ---------------------------------------------------------------- */
+  /* 2.15b  PLANTING                                                    */
+  /*                                                                    */
+  /* Every exterior in this set is more vegetation than building. A CG  */
+  /* tree made of smoothly-shaded lumps is the fastest way to lose a    */
+  /* blind test, so foliage here is built the way an offline renderer   */
+  /* builds it: thousands of alpha-cut leaf cards on a real branch      */
+  /* skeleton, merged into ONE BufferGeometry per plant so the draw     */
+  /* cost stays flat and the shadow map gets a genuinely perforated     */
+  /* canopy.                                                            */
+  /* ---------------------------------------------------------------- */
+
+  /** Deterministic PRNG — planting must be identical between screenshots. */
+  function prng(seed) {
+    let a = (seed >>> 0) || 1;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /**
+   * Merge N oriented quads into one geometry.
+   * `cards` = [{ p:[x,y,z], n:[..] (card normal), up:[..], w, h }]
+   */
+  function cardsGeometry(cards) {
+    const n = cards.length;
+    const pos = new Float32Array(n * 18);
+    const nrm = new Float32Array(n * 18);
+    const uv = new Float32Array(n * 12);
+    let pi = 0, ni = 0, ui = 0;
+    for (const c of cards) {
+      const N = v3norm(c.n);
+      let U = v3norm(v3cross(c.up || [0, 1, 0], N));
+      if (!(U[0] * U[0] + U[1] * U[1] + U[2] * U[2] > 1e-6)) U = v3norm(v3cross([1, 0, 0], N));
+      const V = v3norm(v3cross(N, U));
+      const hw = c.w / 2, hh = c.h / 2;
+      const P = (su, sv) => [
+        c.p[0] + U[0] * su * hw + V[0] * sv * hh,
+        c.p[1] + U[1] * su * hw + V[1] * sv * hh,
+        c.p[2] + U[2] * su * hw + V[2] * sv * hh,
+      ];
+      const a = P(-1, -1), b = P(1, -1), d = P(1, 1), e = P(-1, 1);
+      // Bend the vertex normals outward from the card centre so a flat quad
+      // shades like a rounded clump instead of a piece of cardboard.
+      const bulge = c.bulge === undefined ? 0.28 : c.bulge;
+      const vn = (su, sv) => v3norm([
+        N[0] + (U[0] * su + V[0] * sv) * bulge,
+        N[1] + (U[1] * su + V[1] * sv) * bulge,
+        N[2] + (U[2] * su + V[2] * sv) * bulge,
+      ]);
+      const na = vn(-1, -1), nb = vn(1, -1), nd = vn(1, 1), ne = vn(-1, 1);
+      const tri = (p0, p1, p2, n0, n1, n2, u0, u1, u2) => {
+        pos[pi++] = p0[0]; pos[pi++] = p0[1]; pos[pi++] = p0[2];
+        pos[pi++] = p1[0]; pos[pi++] = p1[1]; pos[pi++] = p1[2];
+        pos[pi++] = p2[0]; pos[pi++] = p2[1]; pos[pi++] = p2[2];
+        nrm[ni++] = n0[0]; nrm[ni++] = n0[1]; nrm[ni++] = n0[2];
+        nrm[ni++] = n1[0]; nrm[ni++] = n1[1]; nrm[ni++] = n1[2];
+        nrm[ni++] = n2[0]; nrm[ni++] = n2[1]; nrm[ni++] = n2[2];
+        uv[ui++] = u0[0]; uv[ui++] = u0[1];
+        uv[ui++] = u1[0]; uv[ui++] = u1[1];
+        uv[ui++] = u2[0]; uv[ui++] = u2[1];
+      };
+      tri(a, b, d, na, nb, nd, [0, 0], [1, 0], [1, 1]);
+      tri(a, d, e, na, nd, ne, [0, 0], [1, 1], [0, 1]);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setAttribute('uv1', new THREE.BufferAttribute(uv, 2));   // aoMap channel
+    g.computeBoundingSphere();
+    return g;
+  }
+
+  /**
+   * A cloud of leaf cards filling an ellipsoidal shell.
+   *
+   * @param {THREE.Material} material  an alpha-tested leaf sheet
+   * @param {object} o
+   * @param {number[]} o.center  [x,y,z]
+   * @param {number[]} o.radii   [rx,ry,rz]
+   * @param {number} o.count     cards
+   * @param {number} o.card      card edge length in feet
+   * @param {number} [o.shell=0.55]  0 = solid fill, 1 = surface only
+   * @param {number} [o.lumps=5] low-frequency lobes that break the ellipsoid
+   * @param {number} [o.flatten=0]   crop the bottom of the ellipsoid, 0..1
+   * @param {number} [o.seed=7]
+   * @returns {THREE.Mesh}
+   */
+  function leafCanopy(material, o) {
+    const R = prng(o.seed === undefined ? 7 : o.seed);
+    const [cx, cy, cz] = o.center;
+    const [rx, ry, rz] = o.radii;
+    const shell = o.shell === undefined ? 0.55 : o.shell;
+    const lumps = o.lumps === undefined ? 5 : o.lumps;
+    const flatten = o.flatten || 0;
+    const card = o.card;
+    const pw = o.power === undefined ? 2 : o.power;
+    // A handful of lobes: real canopies are a bunch of overlapping masses,
+    // never one smooth solid of revolution.
+    // Lobes CUT IN rather than bulge out, so the finished cloud can never
+    // exceed `radii` — otherwise a canopy specified as 17 ft across renders
+    // 27 ft across and the tree stops matching the photograph.
+    const lobe = [];
+    for (let i = 0; i < lumps; i++) {
+      const a = R() * Math.PI * 2, e = (R() - 0.42) * 1.3;
+      lobe.push({
+        d: [Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e)],
+        k: 0.10 + R() * 0.24,
+      });
+    }
+    const cards = [];
+    let guard = 0;
+    while (cards.length < o.count && guard++ < o.count * 12) {
+      // uniform-ish direction
+      const u = R() * 2 - 1, ph = R() * Math.PI * 2;
+      const s = Math.sqrt(Math.max(0, 1 - u * u));
+      const d = [s * Math.cos(ph), u, s * Math.sin(ph)];
+      if (flatten > 0 && d[1] < -1 + flatten * 2 && R() > 0.12) continue;
+      let g = 1;
+      for (const L of lobe) g -= L.k * Math.max(0, d[0] * L.d[0] + d[1] * L.d[1] + d[2] * L.d[2]) ** 2;
+      if (g < 0.42) g = 0.42;
+      const t = Math.pow(R(), 1 / 3);                        // volume-uniform
+      const rad = g * (1 - shell + shell * (0.72 + 0.28 * t));
+      // Superellipsoid: p = 2 is a plain ellipsoid, p = 5-8 is the flat-topped,
+      // flat-sided solid a sheared privet actually is. A clipped hedge read as
+      // a sphere is one of the loudest "CG garden" tells there is.
+      let ss = 1;
+      if (pw > 2.0001) {
+        ss = Math.pow(
+          Math.pow(Math.abs(d[0]), pw) + Math.pow(Math.abs(d[1]), pw) + Math.pow(Math.abs(d[2]), pw),
+          1 / pw
+        ) || 1;
+      }
+      const dx = d[0] / ss, dy = d[1] / ss, dz = d[2] / ss;
+      const p = [cx + dx * rx * rad, cy + dy * ry * rad, cz + dz * rz * rad];
+      // Surface normal of the superellipsoid (gradient), so a flat face on a
+      // clipped hedge really does face the sun as one plane.
+      let sn = d;
+      if (pw > 2.0001) {
+        const q = pw - 1;
+        sn = v3norm([
+          Math.sign(dx) * Math.pow(Math.abs(dx), q) / rx,
+          Math.sign(dy) * Math.pow(Math.abs(dy), q) / ry,
+          Math.sign(dz) * Math.pow(Math.abs(dz), q) / rz,
+        ]);
+      }
+      // Cards face outward, jittered, with a downward droop on the outside.
+      const jit = o.jitter === undefined ? 0.75 : o.jitter;
+      const nrm = v3norm([
+        sn[0] + (R() - 0.5) * jit,
+        sn[1] + (R() - 0.5) * jit - 0.18,
+        sn[2] + (R() - 0.5) * jit,
+      ]);
+      const up = v3norm([(R() - 0.5) * 0.9, 1, (R() - 0.5) * 0.9]);
+      const sc = card * (0.80 + 0.38 * R());
+      cards.push({ p, n: nrm, up, w: sc, h: sc * (0.85 + 0.3 * R()), bulge: o.bulge === undefined ? 0.28 : o.bulge });
+    }
+    const m = new THREE.Mesh(cardsGeometry(cards), material);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    m.name = o.name || 'leafCanopy';
+    return m;
+  }
+
+  /**
+   * A tapered, slightly crooked limb from `a` to `b`.
+   * Returns a mesh; radii are at the two ends.
+   */
+  function limb(material, a, b, r0, r1, seg = 8, bow = 0.0, rnd = Math.random) {
+    const pts = [];
+    const N = 5;
+    const ax = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const side = v3norm(v3cross(ax, [0, 1, 0]));
+    const side2 = v3norm(v3cross(ax, side));
+    const s1 = (rnd() - 0.5) * bow, s2 = (rnd() - 0.5) * bow;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const w = Math.sin(t * Math.PI);
+      pts.push(new THREE.Vector3(
+        a[0] + ax[0] * t + (side[0] * s1 + side2[0] * s2) * w,
+        a[1] + ax[1] * t + (side[1] * s1 + side2[1] * s2) * w,
+        a[2] + ax[2] * t + (side[2] * s1 + side2[2] * s2) * w
+      ));
+    }
+    const curve = new THREE.CatmullRomCurve3(pts);
+    const g = new THREE.TubeGeometry(curve, N * 2, 1, seg, false);
+    // taper by rewriting the radius along the tube
+    const pos = g.attributes.position;
+    const nor = g.attributes.normal;
+    const rings = N * 2 + 1;
+    for (let i = 0; i < pos.count; i++) {
+      const ring = Math.floor(i / (seg + 1));
+      const t = ring / (rings - 1);
+      const r = r0 + (r1 - r0) * t;
+      const cxp = curve.getPointAt(Math.min(1, t));
+      pos.setXYZ(i,
+        cxp.x + nor.getX(i) * r,
+        cxp.y + nor.getY(i) * r,
+        cxp.z + nor.getZ(i) * r);
+    }
+    pos.needsUpdate = true;
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, material);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    return m;
+  }
+
+  /**
+   * A multi-stem ornamental / shade tree: leaning trunks, a real branch
+   * skeleton, and leaf-card clumps hung on the branch tips.
+   *
+   * @param {object} o
+   * @param {THREE.Material} o.bark
+   * @param {THREE.Material} o.leaf
+   * @param {number[]} o.at        [x, z] plan position
+   * @param {number} o.groundY
+   * @param {number} o.height      overall height, feet
+   * @param {number} o.spread      canopy diameter, feet
+   * @param {number} o.crownBase   height of the lowest foliage
+   * @param {number} [o.stems=3]
+   * @param {number} [o.trunkR=0.6]
+   * @param {number} [o.clumps=26] leaf-card clumps
+   * @param {number} [o.cardsPer=34]
+   * @param {number} [o.card=3.2]  leaf-card size, feet
+   * @param {number} [o.seed=11]
+   * @param {number} [o.lean=0.10]
+   */
+  function deciduousTree(o) {
+    const R = prng(o.seed === undefined ? 11 : o.seed);
+    const g = new THREE.Group();
+    g.name = o.name || 'tree';
+    const [x0, z0] = o.at;
+    const y0 = o.groundY;
+    const stems = o.stems === undefined ? 3 : o.stems;
+    const trunkR = o.trunkR === undefined ? 0.6 : o.trunkR;
+    const forkY = y0 + (o.crownBase - y0) * 0.42;
+    const tips = [];
+
+    // one short common butt, then the stems fan out of it
+    if (stems > 1) {
+      g.add(limb(o.bark, [x0, y0 - 0.6, z0], [x0, y0 + 0.9, z0], trunkR * 1.42, trunkR * 1.12, 12, 0.05, R));
+    }
+    for (let i = 0; i < stems; i++) {
+      const a = (i / stems) * Math.PI * 2 + R() * 0.9;
+      const lean = (o.lean === undefined ? 0.10 : o.lean) * (0.6 + R() * 0.9);
+      const sr = trunkR * (0.62 + 0.42 * R());
+      const base = [x0 + Math.cos(a) * trunkR * 0.5, y0 - 0.5, z0 + Math.sin(a) * trunkR * 0.5];
+      const topY = forkY + (o.crownBase - forkY) * (0.55 + 0.5 * R());
+      const top = [
+        x0 + Math.cos(a) * (topY - y0) * lean * 2.6,
+        topY,
+        z0 + Math.sin(a) * (topY - y0) * lean * 2.6,
+      ];
+      g.add(limb(o.bark, base, top, sr * 1.15, sr * 0.55, 10, 0.30, R));
+      // two orders of branch off each stem. A near tree needs a real skeleton:
+      // in the reference photo the canopy is lacy enough that limbs, sky and
+      // the house behind all show through it.
+      // Every limb has to die INSIDE the leaf cloud. A branch tip that pokes
+      // out past the foliage reads as a bare stick radiating from a bush and
+      // is the ugliest thing a procedural tree can do.
+      const RMAX = o.spread * 0.5 * 0.78;
+      const clampToCrown = (p) => {
+        const dx = p[0] - x0, dz = p[2] - z0;
+        const d = Math.hypot(dx, dz);
+        if (d > RMAX) { p[0] = x0 + dx * RMAX / d; p[2] = z0 + dz * RMAX / d; }
+        if (p[1] > o.height - 1.0) p[1] = o.height - 1.0;
+        return p;
+      };
+      const nb = (o.branches === undefined ? 3 : o.branches) + ((R() * 2) | 0);
+      for (let j = 0; j < nb; j++) {
+        const ba = a + (R() - 0.5) * 2.4 + (j / nb) * Math.PI * 2;
+        const rr = o.spread * 0.5 * (0.34 + 0.34 * R());
+        const by = topY + (o.height - topY) * (0.30 + 0.55 * R());
+        const end = clampToCrown([top[0] + Math.cos(ba) * rr, by, top[2] + Math.sin(ba) * rr]);
+        g.add(limb(o.bark, top, end, sr * 0.5, sr * 0.16, 7, 0.35, R));
+        tips.push(end);
+        const nb2 = (o.subBranches === undefined ? 2 : o.subBranches) + ((R() * 2) | 0);
+        for (let k = 0; k < nb2; k++) {
+          const ca = ba + (R() - 0.5) * 2.0;
+          const cr = o.spread * 0.5 * (0.12 + 0.20 * R());
+          const e2 = clampToCrown([
+            end[0] + Math.cos(ca) * cr,
+            by + (R() - 0.45) * (o.height - by) * 0.8,
+            end[2] + Math.sin(ca) * cr,
+          ]);
+          g.add(limb(o.bark, end, e2, sr * 0.16, sr * 0.06, 5, 0.28, R));
+          tips.push(e2);
+        }
+      }
+    }
+
+    // Leaf clumps hung on the tips, plus a few free-floating ones to close
+    // the silhouette. One merged mesh per clump keeps the draw count sane.
+    const clumps = o.clumps === undefined ? 26 : o.clumps;
+    const cardsPer = o.cardsPer === undefined ? 34 : o.cardsPer;
+    const cy = (o.crownBase + o.height) / 2;
+    const cards = [];
+    const cardW = o.card === undefined ? 3.2 : o.card;
+    const R2 = o.spread * 0.5;
+    for (let i = 0; i < clumps; i++) {
+      // clump radius, and the envelope the clump CENTRE may occupy so the
+      // finished canopy never grows past `spread` — cards included
+      const cr = R2 * (0.17 + 0.11 * R());
+      const room = Math.max(0.4, R2 - cr - cardW * 0.62);
+      let c;
+      if (i < tips.length) {
+        const t = tips[(i * 7 + 3) % tips.length];
+        const dx = t[0] - x0, dz = t[2] - z0;
+        const d = Math.hypot(dx, dz);
+        const k = d > room ? room / d : 1;
+        c = [x0 + dx * k, t[1], z0 + dz * k];
+      } else {
+        const a = R() * Math.PI * 2;
+        const rr = room * (0.25 + 0.72 * Math.sqrt(R()));
+        c = [x0 + Math.cos(a) * rr, cy + (R() - 0.5) * (o.height - o.crownBase) * 0.9, z0 + Math.sin(a) * rr];
+      }
+      // and keep the clump inside the crown vertically too
+      const yLo = o.crownBase + cr * 0.35;
+      const yHi = o.height - cr - cardW * 0.55;
+      c[1] = Math.min(yHi, Math.max(yLo, c[1]));
+      const sub = leafCanopy(o.leaf, {
+        center: c,
+        radii: [cr, cr * 0.78, cr],
+        count: cardsPer,
+        card: cardW * (0.88 + 0.22 * R()),
+        shell: 0.5,
+        lumps: 3,
+        seed: 900 + i * 17,
+      });
+      cards.push(sub.geometry);
+      sub.geometry = null;
+    }
+    // merge the clumps
+    const merged = mergeGeometries(cards);
+    const canopy = new THREE.Mesh(merged, o.leaf);
+    canopy.castShadow = true;
+    canopy.receiveShadow = true;
+    canopy.name = 'canopy';
+    g.add(canopy);
+    return g;
+  }
+
+  /** Concatenate non-indexed geometries that share the same attribute set. */
+  function mergeGeometries(list) {
+    let n = 0;
+    for (const g of list) n += g.attributes.position.count;
+    const pos = new Float32Array(n * 3);
+    const nrm = new Float32Array(n * 3);
+    const uv = new Float32Array(n * 2);
+    let o3 = 0, o2 = 0;
+    for (const g of list) {
+      pos.set(g.attributes.position.array, o3);
+      nrm.set(g.attributes.normal.array, o3);
+      uv.set(g.attributes.uv.array, o2);
+      o3 += g.attributes.position.array.length;
+      o2 += g.attributes.uv.array.length;
+      g.dispose();
+    }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    out.setAttribute('uv1', new THREE.BufferAttribute(uv, 2));
+    out.computeBoundingSphere();
+    return out;
+  }
+
+  /**
+   * A conifer: straight leader, whorled branches, needle-spray cards.
+   */
+  function coniferTree(o) {
+    const R = prng(o.seed === undefined ? 21 : o.seed);
+    const g = new THREE.Group();
+    g.name = o.name || 'conifer';
+    const [x0, z0] = o.at;
+    const y0 = o.groundY;
+    const trunkR = o.trunkR === undefined ? 0.9 : o.trunkR;
+    g.add(limb(o.bark, [x0, y0 - 0.6, z0], [x0 + (R() - 0.5) * 1.2, o.height, z0 + (R() - 0.5) * 1.2],
+      trunkR * 1.2, trunkR * 0.14, 12, 0.5, R));
+    const whorls = o.whorls === undefined ? 9 : o.whorls;
+    const parts = [];
+    for (let i = 0; i < whorls; i++) {
+      const f = i / (whorls - 1);
+      const y = o.crownBase + f * (o.height - o.crownBase);
+      const rad = (o.spread * 0.5) * (1 - Math.pow(f, 0.85) * 0.88) * (0.82 + 0.34 * R());
+      const per = 3 + ((R() * 3) | 0);
+      for (let j = 0; j < per; j++) {
+        const a = R() * Math.PI * 2;
+        const c = [x0 + Math.cos(a) * rad * 0.62, y - rad * 0.10, z0 + Math.sin(a) * rad * 0.62];
+        g.add(limb(o.bark, [x0, y + rad * 0.12, z0], c, trunkR * 0.20, trunkR * 0.06, 5, 0.3, R));
+        const sub = leafCanopy(o.leaf, {
+          center: c,
+          radii: [rad * 0.72, rad * 0.30, rad * 0.72],
+          count: o.cardsPer === undefined ? 26 : o.cardsPer,
+          card: (o.card === undefined ? 4.0 : o.card) * (0.8 + 0.4 * R()),
+          shell: 0.35,
+          lumps: 2,
+          seed: 300 + i * 31 + j,
+        });
+        parts.push(sub.geometry);
+        sub.geometry = null;
+      }
+    }
+    const canopy = new THREE.Mesh(mergeGeometries(parts), o.leaf);
+    canopy.castShadow = true; canopy.receiveShadow = true;
+    g.add(canopy);
+    return g;
+  }
+
+  /**
+   * A clipped shrub / hedge mass: a solid dark core (so no sky leaks through
+   * the middle) wrapped in a shell of small leaf cards.
+   *
+   * @param {object} o
+   * @param {THREE.Material} o.leaf
+   * @param {THREE.Material} [o.core]  dark interior; defaults to the leaf mat
+   * @param {number[]} o.center [x,y,z] centre of the mass
+   * @param {number[]} o.radii  [rx,ry,rz]
+   * @param {number} [o.density=2.6] cards per square foot of surface
+   * @param {number} [o.card=0.85]
+   */
+  function shrubMass(o) {
+    const g = new THREE.Group();
+    g.name = o.name || 'shrub';
+    const [rx, ry, rz] = o.radii;
+    const pw = o.power === undefined ? 2 : o.power;
+    // The opaque interior. Without it a card shell shows sky through its middle
+    // and the mass reads as a cloud instead of a plant.
+    const core = pw > 2.0001
+      ? new THREE.Mesh(roundedBox(rx * 1.7, ry * 1.7, rz * 1.7, Math.min(rx, ry, rz) * 0.55, 2), o.core || o.leaf)
+      : new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), o.core || o.leaf);
+    if (pw <= 2.0001) core.scale.set(rx * 0.80, ry * 0.80, rz * 0.80);
+    core.position.set(o.center[0], o.center[1], o.center[2]);
+    core.castShadow = true; core.receiveShadow = true;
+    g.add(core);
+    const area = 4 * Math.PI * Math.pow((Math.pow(rx * ry, 1.6) + Math.pow(ry * rz, 1.6) + Math.pow(rz * rx, 1.6)) / 3, 1 / 1.6);
+    const count = Math.max(40, Math.round(area * (o.density === undefined ? 2.6 : o.density)));
+    g.add(leafCanopy(o.leaf, {
+      center: o.center,
+      radii: [rx, ry, rz],
+      count,
+      card: o.card === undefined ? 0.85 : o.card,
+      shell: 0.92,
+      power: pw,
+      jitter: o.jitter,
+      lumps: o.lumps === undefined ? 6 : o.lumps,
+      flatten: o.flatten === undefined ? 0.22 : o.flatten,
+      seed: o.seed === undefined ? 55 : o.seed,
+    }));
+    // A second, inner layer. One shell leaves gaps that show the smooth core
+    // sphere, and a smooth sphere peeping out of a shrub is instantly CG.
+    g.add(leafCanopy(o.leaf, {
+      center: o.center,
+      radii: [rx * 0.86, ry * 0.86, rz * 0.86],
+      count: Math.round(count * 0.55),
+      card: (o.card === undefined ? 0.85 : o.card) * 1.05,
+      shell: 0.75,
+      power: pw,
+      jitter: o.jitter,
+      lumps: o.lumps === undefined ? 6 : o.lumps,
+      flatten: o.flatten === undefined ? 0.22 : o.flatten,
+      seed: (o.seed === undefined ? 55 : o.seed) + 977,
+    }));
+    return g;
+  }
+
+  /* ---------------------------------------------------------------- */
   /* 2.16  exports                                                      */
   /* ---------------------------------------------------------------- */
 
@@ -5028,6 +5499,10 @@ export function makeKit(THREE, mat, tex) {
     straightStair, returnStair, stairRailing, newelPost, turnedOakPost,
     dropBeam, supportColumn, gasFireplace, deckFrame, deckRailing,
     stoneFirePitRing, stackedStonePlanterWall, postAndBeamWall,
+
+    // planting
+    leafCanopy, deciduousTree, coniferTree, shrubMass, limb, cardsGeometry,
+    mergeGeometries,
 
     // furniture
     sofa, sectional, armchair, coffeeTable, sideTable, diningTable, diningChair,

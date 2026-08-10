@@ -31,7 +31,7 @@ import { makeTextures, TEXTURE_INFO, TEXTURE_NAMES } from './textures.js';
 /* Helpers                                                                   */
 /* ======================================================================== */
 
-const MAP_KEYS = ['map', 'normalMap', 'roughnessMap', 'aoMap', 'metalnessMap', 'anisotropyMap'];
+const MAP_KEYS = ['map', 'normalMap', 'roughnessMap', 'aoMap', 'metalnessMap', 'anisotropyMap', 'alphaMap'];
 
 /**
  * Attach a texture set to a material description and remember the real-world
@@ -62,6 +62,10 @@ function withMaps(THREE, mat, set, opts = {}) {
     mat.anisotropyMap = set.anisotropyMap;
     mat.anisotropy = opts.anisotropy === undefined ? 1.0 : opts.anisotropy;
     mat.anisotropyRotation = opts.anisotropyRotation || 0;
+  }
+  if (set.alphaMap && opts.alphaMap !== false) {
+    mat.alphaMap = set.alphaMap;
+    mat.alphaTest = opts.alphaTest === undefined ? 0.45 : opts.alphaTest;
   }
   mat.userData.scaleFeet = set.scaleFeet.slice();
   mat.userData.textureName = set.name;
@@ -389,6 +393,34 @@ export function makeMaterials(THREE, opts = {}) {
     metalness: 0.0,
     envMapIntensity: 0.7,
   }), T('mulchBed'), { normalScale: 1.0, aoMapIntensity: 1.2 }));
+
+  def('treeBark', () => withMaps(THREE, phys(THREE, {
+    metalness: 0.0,
+    envMapIntensity: 0.7,
+  }), T('treeBark'), { normalScale: 1.0, aoMapIntensity: 1.15 }));
+
+  /* ------------------------------------------------------------- foliage */
+  // Alpha-tested leaf sheets. DoubleSide because a card is seen from both
+  // faces inside a canopy; `alphaTest` (not `transparent`) so they sort
+  // correctly against each other AND cast a real perforated shadow.
+  const leafCard = (name, o = {}) => def(name, () => {
+    const m = withMaps(THREE, phys(THREE, {
+      metalness: 0.0,
+      envMapIntensity: 0.85,
+      // Leaves are thin and translucent: the sun coming through the far side
+      // of the canopy is most of what a real tree looks like.
+      sheen: 0.55,
+      sheenRoughness: 0.75,
+      sheenColor: new THREE.Color(o.sheenColor || 0xc4d98a),
+      transmission: 0,
+      side: THREE.DoubleSide,
+    }), T(name), { normalScale: o.normalScale === undefined ? 0.75 : o.normalScale, aoMapIntensity: 0.55, alphaTest: 0.42 });
+    m.shadowSide = THREE.DoubleSide;
+    return m;
+  });
+  leafCard('foliageBroadleaf');
+  leafCard('foliageShrub', { sheenColor: 0xa8c079, normalScale: 0.6 });
+  leafCard('foliageNeedle', { sheenColor: 0x6f8c4a, normalScale: 0.5 });
 
   /* ---------------------------------------------- metals / fabric / glass */
 

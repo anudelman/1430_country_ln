@@ -43,31 +43,42 @@ import { qualityProfile } from './renderer.js';
 /* Defaults — deliberately subtle                                            */
 /* ======================================================================== */
 
+/*
+ * MEASURED, not assumed — docs/PHOTOGRAPHY.md §6.2 supersedes the earlier
+ * guesses that lived here (bloom 0.25, CA 0.0016, vignette 0.16, grain 0.016).
+ * All four of those were measured as ABSENT from the listing photographs, and
+ * adding them makes a render EASIER to spot, not harder. The one thing the
+ * photographs have that a render lacks is a 1-px unsharp halo, so that is now
+ * part of the chain.
+ */
 export const BLOOM_DEFAULTS = Object.freeze({
   enabled: true,
-  strength: 0.25,
-  radius: 0.4,
-  threshold: 0.9,
+  strength: 0.06,
+  radius: 0.15,
+  threshold: 0.98,
 });
 
 export const PHOTO_DEFAULTS = Object.freeze({
   exposure: 1.0,
-  /** Radial CA in UV units at the frame corner. ~1.1 px on a 1500 px frame. */
-  aberration: 0.0016,
-  /** Peak corner darkening, 0..1. Listing photos are barely vignetted. */
-  vignette: 0.16,
+  /** Lateral CA measured at <=0.03 px even at r>700 px. Keep it at zero. */
+  aberration: 0.0,
+  /** Radial luminance actually RISES 1.05x toward the frame edge. */
+  vignette: 0.02,
   vignetteRadius: 0.62,
   /** Linear-space shoulder above `rolloffKnee`; keeps windows off pure white. */
   rolloff: 0.30,
   rolloffKnee: 0.85,
   /** Blown highlights lose saturation, the way a sensor does. */
   highlightDesat: 0.55,
-  /** Fine grain amplitude in display space. */
-  grain: 0.016,
+  /** Fine grain amplitude in display space. Measured sigma = 0.11-0.16/255. */
+  grain: 0.0008,
   /** Grain multiplier in the highlights (shadows always get the full amount). */
   grainHighlight: 0.35,
   /** Black lift — the anti-crush term. */
   lift: 0.006,
+  /** Lightroom capture sharpening: radius ~0.9 px, amount ~0.55. */
+  sharpen: 0.55,
+  sharpenRadius: 0.9,
   saturation: 1.0,
   seed: 17.0,
 });
@@ -93,6 +104,8 @@ export const PhotoFinishShader = {
     uGrainHighlight: { value: PHOTO_DEFAULTS.grainHighlight },
     uLift: { value: PHOTO_DEFAULTS.lift },
     uSaturation: { value: PHOTO_DEFAULTS.saturation },
+    uSharpen: { value: PHOTO_DEFAULTS.sharpen },
+    uSharpenRadius: { value: PHOTO_DEFAULTS.sharpenRadius },
     uSeed: { value: PHOTO_DEFAULTS.seed },
   },
 
@@ -118,6 +131,8 @@ export const PhotoFinishShader = {
     uniform float uGrainHighlight;
     uniform float uLift;
     uniform float uSaturation;
+    uniform float uSharpen;
+    uniform float uSharpenRadius;
     uniform float uSeed;
 
     varying vec2 vUv;
@@ -164,23 +179,26 @@ export const PhotoFinishShader = {
       return fract( ( p3.x + p3.y ) * p3.z );
     }
 
-    void main() {
-      vec2 uv = vUv;
+    /* Fetch the linear HDR scene value with the lens applied. */
+    vec3 fetch( vec2 uv ) {
       vec2 c  = uv - 0.5;
       float r2 = dot( c, c );
-
-      /* --- lens: transverse chromatic aberration, zero on axis ---------- */
       float amt = uAberration * r2 * 4.0;
       vec3 col;
-      col.r = texture2D( tDiffuse, uv + c * amt ).r;
-      col.g = texture2D( tDiffuse, uv ).g;
-      col.b = texture2D( tDiffuse, uv - c * amt ).b;
+      if ( uAberration > 0.0 ) {
+        col.r = texture2D( tDiffuse, uv + c * amt ).r;
+        col.g = texture2D( tDiffuse, uv ).g;
+        col.b = texture2D( tDiffuse, uv - c * amt ).b;
+      } else {
+        col = texture2D( tDiffuse, uv ).rgb;
+      }
       col = max( col, vec3( 0.0 ) );
-
-      /* --- lens: shallow natural vignette ------------------------------- */
       float vr = clamp( r2 / max( uVignetteRadius, 1e-4 ), 0.0, 1.0 );
-      col *= 1.0 - uVignette * pow( vr, 1.35 );
+      return col * ( 1.0 - uVignette * pow( vr, 1.35 ) );
+    }
 
+    /* linear HDR -> display-referred sRGB. */
+    vec3 grade( vec3 col ) {
       /* --- camera: exposure --------------------------------------------- */
       col *= uExposure;
 
@@ -200,9 +218,30 @@ export const PhotoFinishShader = {
       col += uLift * ( 1.0 - col );
 
       float lum = dot( col, LUMA );
-      col = mix( vec3( lum ), col, uSaturation );
+      return mix( vec3( lum ), col, uSaturation );
+    }
+
+    void main() {
+      vec2 uv = vUv;
+      vec3 col = grade( fetch( uv ) );
+
+      /* --- Lightroom capture sharpening --------------------------------
+       * Measured on the reference set: a 140-level step carries a +36
+       * overshoot at -1 px and a -24 undershoot at +1 px. Every high-contrast
+       * edge in the photographs has it; a physically clean render edge does
+       * not, and that alone reads as "3D". Done in DISPLAY space, which is
+       * where Lightroom does it.                                            */
+      if ( uSharpen > 0.0 ) {
+        vec2 d = uSharpenRadius / uResolution;
+        vec3 blur = grade( fetch( uv + vec2( d.x, 0.0 ) ) )
+                  + grade( fetch( uv - vec2( d.x, 0.0 ) ) )
+                  + grade( fetch( uv + vec2( 0.0, d.y ) ) )
+                  + grade( fetch( uv - vec2( 0.0, d.y ) ) );
+        col += uSharpen * ( col - blur * 0.25 );
+      }
 
       /* --- sensor: fine grain, heaviest in the shadows ------------------ */
+      float lum = dot( col, LUMA );
       float n = hash21( gl_FragCoord.xy + vec2( uSeed, uSeed * 1.7 ) );
       col += ( n - 0.5 ) * uGrain * mix( 1.0, uGrainHighlight, lum );
 
@@ -291,6 +330,8 @@ export function createComposer(renderer, scene, camera, {
   u.uGrainHighlight.value = params.grainHighlight;
   u.uLift.value = params.lift;
   u.uSaturation.value = params.saturation;
+  u.uSharpen.value = photo === false ? 0 : params.sharpen;
+  u.uSharpenRadius.value = params.sharpenRadius;
   u.uSeed.value = params.seed;
   composer.addPass(photoPass);
 
@@ -323,6 +364,8 @@ export function setPhotoFinish(composer, patch = {}) {
     grainHighlight: 'uGrainHighlight',
     lift: 'uLift',
     saturation: 'uSaturation',
+    sharpen: 'uSharpen',
+    sharpenRadius: 'uSharpenRadius',
     seed: 'uSeed',
   };
   for (const [k, v] of Object.entries(patch)) {

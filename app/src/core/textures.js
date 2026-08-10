@@ -457,6 +457,9 @@ function pack(name, spec) {
     aoMap: makeTex(canvasFromScalar(ao, size), false, spec.clamp),
   };
   if (spec.met) set.metalnessMap = makeTex(canvasFromScalar(spec.met, size), false, spec.clamp);
+  // Cut-out sheets (foliage cards, screens): `spec.alp` is a 0..1 coverage
+  // field. Used with material.alphaTest, so it also drives the shadow pass.
+  if (spec.alp) set.alphaMap = makeTex(canvasFromScalar(spec.alp, size), false, spec.clamp);
   if (spec.anisoStr) {
     set.anisotropyMap = makeTex(canvasFromAniso(spec.anisoStr, spec.anisoAng, size), false, spec.clamp);
   }
@@ -2091,12 +2094,16 @@ function genLawnGrass(size) {
   // Sunlit turf in these photographs measures R 132-139 / G 141-148 /
   // B 90-104 — a yellow-green that is far LESS saturated than the green a
   // procedural lawn reaches for.  R/G is about 0.94, not 0.7.
-  const shade = hexRGB('#4a5c36');
-  const deep = hexRGB('#647a45');
-  const mid = hexRGB('#7e9455');
-  const lite = hexRGB('#9cae6b');
-  const straw = hexRGB('#a8a067');
-  const thatch = hexRGB('#7d7048');
+  // Late-summer Michigan turf, re-measured: the LIT stripe is 164/161/68 —
+  // R and G are equal and B is only 42% of R. The earlier palette was a
+  // spring green (R/G 0.85, B/G 0.57) and rendered a lawn that was far too
+  // blue-green to sit under this sky.
+  const shade = hexRGB('#414a29');
+  const deep = hexRGB('#596637');
+  const mid = hexRGB('#737b41');
+  const lite = hexRGB('#8f8d50');
+  const straw = hexRGB('#9d9253');
+  const thatch = hexRGB('#74663d');
 
   s.tiltU = new Float32Array(n);
 
@@ -2107,7 +2114,7 @@ function genLawnGrass(size) {
       const i = y * size + x;
 
       /* --- mower stripes: 3 bands per 12 ft tile = 4 ft each ------------ */
-      const edge = fbmT(u01, v01, 3, 2, 2, 6161) * 0.06;   // the roller wanders
+      const edge = fbmT(u01, v01, 3, 2, 2, 6161) * 0.022;  // the roller wanders
       const sp = (v01 + edge) * 3;
       const sq = Math.sin(sp * Math.PI * 2);
       const stripe = smoothstep(-0.30, 0.30, sq);          // 0 = away, 1 = toward
@@ -2123,8 +2130,11 @@ function genLawnGrass(size) {
       /* --- clumps and bare/thin patches --------------------------------- */
       const clump = worleyT(u01, v01, 104, 104, 3030, 1);
       const tuft = 1 - smoothstep(0.14, 0.58, clump.f1);
-      const patch = fbmT(u01, v01, 2, 2, 3, 4040) * 0.5 + 0.5;
-      const patch2 = fbmT(u01, v01, 5, 5, 3, 4141) * 0.5 + 0.5;
+      const patch = fbmT(u01, v01, 1.5, 1.5, 4, 4040) * 0.5 + 0.5;
+      const patch2 = fbmT(u01, v01, 4, 4, 4, 4141) * 0.5 + 0.5;
+      // late-summer turf is patchy: thin dry areas next to rich green ones,
+      // a 30% swing over a few feet. A uniform lawn is a render giveaway.
+      const patch3 = fbmT(u01, v01, 9, 9, 3, 4242) * 0.5 + 0.5;
       const dry = smoothstep(0.62, 0.98, patch * 0.6 + patch2 * 0.5);
       const rich = smoothstep(0.58, 0.10, patch * 0.55 + patch2 * 0.55);
 
@@ -2136,14 +2146,16 @@ function genLawnGrass(size) {
       // thatch showing between the tufts
       c = mixRGB(c, thatch, (1 - tuft) * 0.16);
       // the bent blades of one stripe throw more light back
-      c = scaleRGB(c, mix(0.88, 1.12, stripe));
+      c = scaleRGB(c, mix(0.955, 1.045, stripe));
       c = scaleRGB(c, 0.945 + tuft * 0.11);
+      c = scaleRGB(c, 0.80 + 0.42 * patch3);
+      c = mixRGB(c, straw, smoothstep(0.58, 0.95, patch3) * 0.35);
 
       const h = 0.45 + tuft * 0.24 + blade * 0.34 + (patch2 - 0.5) * 0.16;
       setPx(s, i, c, clamp01(h), clamp01(0.80 - stripe * 0.10 + (1 - tuft) * 0.05));
       // the actual lay of the blades — this is what makes the stripe survive
       // a change of viewpoint
-      s.tiltU[i] = lay * 0.55;
+      s.tiltU[i] = lay * 0.16;
     }
   }
   s.reliefFt = 0.020;
@@ -2151,13 +2163,185 @@ function genLawnGrass(size) {
   return s;
 }
 
+/* ---------------------------------------------------------------- foliage */
+/**
+ * A cut-out spray of leaves on a transparent card. Used with `alphaTest`, so
+ * the same sheet drives the shadow pass and the canopy throws a real dappled
+ * shadow instead of a smooth blob.
+ *
+ * The single most damaging thing about a CG tree is a canopy made of smooth
+ * shaded lumps: a real canopy at 40 ft still resolves individual leaves, each
+ * one catching the sun at its own angle, with sky showing through the gaps.
+ * These sheets are what buy that.
+ *
+ * @param {number} size    texture size
+ * @param {object} o
+ * @param {number} o.count       leaves per sheet
+ * @param {number} o.leafR       leaf half-length, in 0..1 sheet units
+ * @param {number} o.aspect      leaf width / length
+ * @param {number} o.pointy      1 = round (redbud/katsura), 3 = lanceolate
+ * @param {string[]} o.tones     leaf albedos, sampled per leaf
+ * @param {number} o.spread      radial spread of the spray, 0..0.5
+ */
+function leafSheet(size, o) {
+  const s = blank(size, o.scaleFeet || [1, 1]);
+  const n = size * size;
+  s.alp = new Float32Array(n);
+  s.clamp = true;
+  const tones = o.tones.map(hexRGB);
+  const depth = new Float32Array(n);     // painter's-algorithm z
+  for (let i = 0; i < n; i++) depth[i] = -1;
+
+  const R = mulberry32(o.seed || 1234);
+  const count = o.count;
+  for (let k = 0; k < count; k++) {
+    // Cluster toward the middle of the sheet with a soft radial falloff, and
+    // let a handful of leaves hang past the edge so the silhouette is ragged.
+    const a = R() * Math.PI * 2;
+    const rr = o.spread * Math.pow(R(), 0.62);
+    const cx = 0.5 + Math.cos(a) * rr;
+    const cy = 0.5 + Math.sin(a) * rr * 0.92;
+    const ang = R() * Math.PI * 2;
+    const len = o.leafR * (0.62 + 0.75 * R());
+    const wid = len * o.aspect * (0.8 + 0.4 * R());
+    // leaves near the sheet edge are further from the light -> darker
+    const z = R();
+    const tone = tones[(R() * tones.length) | 0];
+    const shadeK = 0.62 + 0.55 * z;
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const rad = Math.max(len, wid) + 2 / size;
+    const x0 = Math.max(0, Math.floor((cx - rad) * size));
+    const x1 = Math.min(size - 1, Math.ceil((cx + rad) * size));
+    const y0 = Math.max(0, Math.floor((cy - rad) * size));
+    const y1 = Math.min(size - 1, Math.ceil((cy + rad) * size));
+    for (let y = y0; y <= y1; y++) {
+      const py = (y + 0.5) / size - cy;
+      for (let x = x0; x <= x1; x++) {
+        const px = (x + 0.5) / size - cx;
+        const lx = (px * ca + py * sa) / len;      // along the midrib
+        const ly = (-px * sa + py * ca) / wid;
+        // teardrop: full width at the base, tapering to the tip
+        const taper = 1 - Math.pow(Math.max(0, (lx + 1) * 0.5), o.pointy) * 0.92;
+        const d = lx * lx + (ly * ly) / Math.max(taper * taper, 0.02);
+        if (d > 1) continue;
+        const i = y * size + x;
+        if (z < depth[i]) continue;
+        depth[i] = z;
+        const edge = 1 - d;                       // 0 at rim, 1 at midrib
+        // midrib + a couple of side veins, and a curled highlight
+        const vein = Math.exp(-Math.abs(ly) * 26) * 0.20
+          + Math.exp(-Math.abs(Math.abs(ly) - 0.42) * 20) * 0.08;
+        let c = scaleRGB(tone, shadeK * (0.90 + 0.30 * edge) * (1 - vein * 0.55));
+        s.alb[i * 3] = c[0]; s.alb[i * 3 + 1] = c[1]; s.alb[i * 3 + 2] = c[2];
+        // height: the leaf domes away from the midrib and sits proud of the
+        // ones behind it, so the normal map lights each leaf separately
+        s.hgt[i] = clamp01(0.18 + z * 0.55 + Math.sqrt(Math.max(edge, 0)) * 0.22 + vein * 0.4);
+        s.rgh[i] = 0.60 + 0.18 * (1 - edge);
+        // a soft 1-texel rim keeps alphaTest from aliasing into a jagged edge
+        s.alp[i] = clamp01(0.35 + d * 0.0 + Math.min(1, edge * size * 0.06) * 0.75);
+      }
+    }
+  }
+  s.reliefFt = o.reliefFt === undefined ? 0.05 : o.reliefFt;
+  s.aoStrength = 1.1;
+  return s;
+}
+
+/** Broad round leaves — the front-yard ornamental (redbud/katsura habit). */
+function genFoliageBroadleaf(size) {
+  return leafSheet(size, {
+    seed: 20604,
+    count: 150,
+    leafR: 0.088,
+    aspect: 0.86,
+    pointy: 2.2,
+    spread: 0.40,
+    scaleFeet: [4, 4],
+    tones: [
+      '#4b7229', '#55802f', '#5f8b36', '#6b973b', '#3d5c23',
+      '#77a03e', '#57762c', '#83a545', '#456427', '#658a34',
+    ],
+  });
+}
+
+/** Small dense leaves — clipped boxwood / privet / euonymus. */
+function genFoliageShrub(size) {
+  return leafSheet(size, {
+    seed: 771,
+    count: 320,
+    leafR: 0.048,
+    aspect: 0.62,
+    pointy: 1.6,
+    spread: 0.44,
+    scaleFeet: [1.6, 1.6],
+    reliefFt: 0.02,
+    tones: [
+      '#3d5c24', '#476928', '#354e20', '#527a2c', '#2e441c',
+      '#5d8631', '#436326', '#293c18',
+    ],
+  });
+}
+
+/** Conifer needle spray — the big pine on the west edge of the front lot. */
+function genFoliageNeedle(size) {
+  return leafSheet(size, {
+    seed: 5099,
+    count: 620,
+    leafR: 0.12,
+    aspect: 0.075,
+    pointy: 0.6,
+    spread: 0.40,
+    scaleFeet: [3, 3],
+    reliefFt: 0.015,
+    tones: [
+      '#25401f', '#2c4a24', '#1c3218', '#35562a', '#16280f', '#3d5f2e',
+    ],
+  });
+}
+
+/* ------------------------------------------------------------------ bark */
+function genTreeBark(size) {
+  const TU = 2.0, TV = 3.0;
+  const s = blank(size, [TU, TV]);
+  const dark = hexRGB('#3d362e');
+  const mid = hexRGB('#6a6055');
+  const lite = hexRGB('#8d857a');
+  const moss = hexRGB('#5c6446');
+  for (let y = 0; y < size; y++) {
+    const v01 = (y + 0.5) / size;
+    for (let x = 0; x < size; x++) {
+      const u01 = (x + 0.5) / size;
+      const i = y * size + x;
+      // vertical fissures: ridged noise stretched hard along V
+      const w = warpT(u01, v01, 6, 2, 0.05, 313);
+      const fis = ridgedT(w[0], w[1], 26, 3, 4, 909, 0.5);
+      const fine = fbmT(u01, v01, 90, 14, 3, 707);
+      const plate = worleyT(u01, v01, 9, 3, 505, 0.9);
+      const groove = smoothstep(0.72, 1.0, fis);
+      let c = mixRGB(mid, lite, clamp01(fine * 0.5 + 0.5));
+      c = mixRGB(c, dark, groove * 0.85);
+      c = mixRGB(c, dark, (1 - smoothstep(0.02, 0.12, plate.f2 - plate.f1)) * 0.5);
+      c = mixRGB(c, moss, clamp01(fbmT(u01, v01, 3, 3, 2, 1313) * 0.5 + 0.5) * 0.18);
+      const h = 0.55 - groove * 0.5 + fine * 0.2;
+      setPx(s, i, c, clamp01(h), clamp01(0.92 - fine * 0.05));
+    }
+  }
+  s.reliefFt = 0.045;
+  s.aoStrength = 2.0;
+  return s;
+}
+
 /* ------------------------------------------------------------- mulch bed */
 function genMulchBed(size) {
   const TU = 3.0, TV = 3.0;
   const s = blank(size, [TU, TV]);
+  // Shredded hardwood, re-measured off the tree ring in
+  // straight_on_view_of_house_from_street.png: SUNLIT mulch is a mid brown
+  // around 110/85/60, not the near-black the old palette rendered. It only
+  // goes black where it sits in the shade of the foundation planting.
   const tones = [
-    hexRGB('#2b2119'), hexRGB('#3a2c20'), hexRGB('#241c15'), hexRGB('#493829'),
-    hexRGB('#312519'), hexRGB('#54402d'),
+    hexRGB('#4a3a2a'), hexRGB('#5c4834'), hexRGB('#3e3024'), hexRGB('#6b543c'),
+    hexRGB('#4f3d2c'), hexRGB('#7a6045'),
   ];
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
@@ -2189,7 +2373,10 @@ function genMulchBed(size) {
 function genConcreteDriveway(size) {
   const TU = 6.0, TV = 6.0;
   const s = blank(size, [TU, TV]);
-  const base = hexRGB('#b7b5b0');
+  // MEASURED off straight_on_view_of_house_from_street.png: sunlit broom
+  // concrete reads 170 / 174 / 179 — a mid grey with a faint COOL cast, not
+  // the near-white a default concrete albedo renders to.
+  const base = hexRGB('#949699');
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
     for (let x = 0; x < size; x++) {
@@ -2423,6 +2610,10 @@ const REG = {
   asphaltShingle: { hero: false, gen: genAsphaltShingle, scaleFeet: [3, 5.5 / 12 * 4], note: 'Charcoal architectural shingle, 5.5" exposure.' },
   lawnGrass: { hero: true, gen: genLawnGrass, scaleFeet: [12, 12], note: 'Lawn: 4 ft mower stripes running along +U, real alternating blade lay, clumpy with straw patches.' },
   mulchBed: { hero: false, gen: genMulchBed, scaleFeet: [3, 3], note: 'Dark shredded hardwood mulch.' },
+  treeBark: { hero: false, gen: genTreeBark, scaleFeet: [2, 3], note: 'Grey-brown fissured bark; fissures run along +V.' },
+  foliageBroadleaf: { hero: true, clamp: true, gen: genFoliageBroadleaf, scaleFeet: [4, 4], note: 'Cut-out spray of broad round leaves (alphaMap). Canopy card for deciduous trees.' },
+  foliageShrub: { hero: false, clamp: true, gen: genFoliageShrub, scaleFeet: [1.6, 1.6], note: 'Cut-out spray of small dense leaves (alphaMap). Clipped boxwood / privet.' },
+  foliageNeedle: { hero: false, clamp: true, gen: genFoliageNeedle, scaleFeet: [3, 3], note: 'Cut-out conifer needle spray (alphaMap).' },
 
   /* --- metals, fabrics, glass --- */
   stainlessBrushed: { hero: false, gen: genStainlessBrushed, scaleFeet: [1.5, 1.5], note: 'Brushed stainless; brush runs along +U.' },

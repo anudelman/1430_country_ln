@@ -296,6 +296,8 @@ export function normalizePreset(key, p) {
     shiftX: p.shiftX === undefined ? 0 : p.shiftX,
     aspect,
     exposure: p.exposure === undefined ? null : p.exposure,
+    /** Per-preset PhotoFinish grade overrides — see core/post.js. */
+    post: p.post && typeof p.post === 'object' ? Object.assign({}, p.post) : null,
     near: p.near === undefined ? LENS.near : p.near,
     far: p.far === undefined ? LENS.far : p.far,
     notes: p.notes || '',

@@ -1,1177 +1,1320 @@
 {
-  "Kitchen_view_4": {
-    "photo": "Kitchen_view_4.png",
-    "room": "kitchen",
-    "level": "first",
-    "pos": [
-      24,
-      4,
-      4.5
-    ],
-    "target": [
-      15.5,
-      4,
-      24
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5119,
-    "exposure": 1.15,
-    "pixels": [
-      1527,
-      1010
-    ],
-    "estimated": true,
-    "note": "From the breakfast-nook side looking back SSW at the kitchen. The kitchen occupies only the left third — pendants, hood, fridge, island — while the right two-thirds is empty open floor, a white boxed structural column and a basement-style awning window. Emphasises how open the plan is. ~14.6 mm."
-  },
-  "backyard_1": {
-    "photo": "backyard_1.png",
-    "room": "exterior-rear",
-    "level": "exterior",
-    "pos": [
-      -16,
-      4.3,
-      -46
-    ],
-    "target": [
-      26,
-      4.3,
-      -8
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.5074,
-    "exposure": 0.95,
-    "pixels": [
-      1530,
-      1015
-    ],
-    "estimated": true,
-    "note": "Rear yard from the far west corner looking ENE. Deep lawn fills the lower half, house and deck sit in the right third, evergreens close the left edge, the stacked-limestone planter wall and fire-pit terrace read at centre-right. ~19 mm equiv, heavy dappled shade."
-  },
-  "backyard_fire_pit_1": {
-    "photo": "backyard_fire_pit_1.png",
-    "room": "fire-pit",
-    "level": "exterior",
-    "pos": [
-      26,
-      3.95,
-      -30
-    ],
-    "target": [
-      28,
-      3.95,
-      -5
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.4567,
-    "exposure": 0.95,
-    "pixels": [
-      1311,
-      900
-    ],
-    "estimated": true,
-    "note": "From the lawn just outside the fire-pit terrace looking back at the house. Stacked-limestone seat wall arcs across the bottom third, steel fire bowl with mesh screen lit at centre-right, deck and full-height rear glazing behind. This PNG is 1311x900 (aspect 1.457) — the narrowest crop in the set."
-  },
-  "backyard_fire_pit_2": {
-    "photo": "backyard_fire_pit_2.png",
-    "room": "fire-pit",
-    "level": "exterior",
-    "pos": [
-      18,
-      3.95,
-      -32
-    ],
-    "target": [
-      26,
-      3.95,
-      -7
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.5005,
-    "exposure": 0.95,
-    "pixels": [
-      1514,
-      1009
-    ],
-    "estimated": true,
-    "note": "A few feet west of fire_pit_1 and a step back, same subject: seat wall foreground, lit fire bowl left of centre, house and deck behind, flagstone path running off to the right."
-  },
-  "backyard_fire_pit_3": {
-    "photo": "backyard_fire_pit_3.png",
-    "room": "fire-pit",
-    "level": "exterior",
-    "pos": [
-      46,
-      3.95,
-      -8
-    ],
-    "target": [
-      20,
-      3.95,
-      -34
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.5015,
-    "exposure": 0.95,
-    "pixels": [
-      1527,
-      1017
-    ],
-    "estimated": true,
-    "note": "Reverse angle: standing east of the terrace looking WSW away from the house. Irregular flagstone paving fills the foreground, lit fire bowl and the low seat wall at centre-left, lawn, fence and a neighbour shed in the middle distance. ~19 mm."
-  },
-  "backyard_mulch_grass_1": {
-    "photo": "backyard_mulch_grass_1.png",
-    "room": "exterior-rear",
-    "level": "exterior",
-    "pos": [
-      -10,
-      4.3,
-      -58
-    ],
-    "target": [
-      24,
-      4.3,
-      -14
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.5079,
-    "exposure": 0.95,
-    "pixels": [
-      1532,
-      1016
-    ],
-    "estimated": true,
-    "note": "From the NW corner of the rear lot across the river-cobble-edged mulch bed and the kidney of lawn toward the house. Trees on the left, mulch and cobble edging sweeping through the foreground, house small in the middle distance. ~19 mm equiv."
-  },
-  "backyard_mulch_stone_steps": {
-    "photo": "backyard_mulch_stone_steps.png",
-    "room": "exterior-rear",
-    "level": "exterior",
-    "pos": [
-      -8,
-      4.3,
-      -30
-    ],
-    "target": [
-      -2.5,
-      4.3,
-      -8
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.5049,
-    "exposure": 0.95,
-    "pixels": [
-      1529,
-      1016
-    ],
-    "estimated": true,
-    "note": "Tight along the west flank of the house looking back toward the deck. Siding, soffit and a condenser on the left edge, a line of square stepping stones running through mulch up the centre, multi-stem trees on the right. Short stand-off makes it read wide (~17 mm)."
-  },
-  "backyard_patio_1": {
-    "photo": "backyard_patio_1.png",
-    "room": "deck-patio",
-    "level": "exterior",
-    "pos": [
-      20,
-      4.8,
-      -4
-    ],
-    "target": [
-      22,
-      4.8,
-      -40
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.4941,
-    "exposure": 0.95,
-    "pixels": [
-      1527,
-      1022
-    ],
-    "estimated": true,
-    "note": "Standing on the main deck looking away from the house. Gray composite deck boards run left-to-right across the whole bottom half, two curved bench seats, flagstone landing and the mown lawn beyond, big trunks rising through the frame. ~18-19 mm equiv, eye level above deck."
-  },
-  "backyard_patio_2": {
-    "photo": "backyard_patio_2.png",
-    "room": "deck-patio",
-    "level": "exterior",
-    "pos": [
-      28,
-      4.8,
-      -3
-    ],
-    "target": [
-      8,
-      4.8,
-      -26
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.5039,
-    "exposure": 0.95,
-    "pixels": [
-      1528,
-      1016
-    ],
-    "estimated": true,
-    "note": "On the deck near the east black-aluminium picket rail, looking WNW. Rail and hedge on the left, deck boards and the notch around a tree through the centre, benches right, lawn and neighbours beyond. ~18-19 mm."
-  },
-  "backyard_straight_on_view_of_house": {
-    "photo": "backyard_straight_on_view_of_house.png",
-    "room": "exterior-rear",
-    "level": "exterior",
-    "pos": [
-      22,
-      4.3,
-      -46
-    ],
-    "target": [
-      22,
-      4.3,
-      -2
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.621,
-    "exposure": 0.95,
-    "pixels": [
-      1433,
-      884
-    ],
-    "estimated": true,
-    "note": "Square-on rear elevation from the middle of the back lawn. Full-height glazing on the two-storey block centre-right, low wing and chimney left, the two-level gray deck across the base. Two big trunks frame left and right. Note this PNG is the odd one: 1433x884, aspect 1.621, i.e. cropped tighter top and bottom than the rest of the set."
-  },
-  "basement_bathroom": {
-    "photo": "basement_bathroom.png",
-    "room": "basement-bath",
-    "level": "basement",
-    "pos": [
-      39.2,
-      -5.1,
-      23.4
-    ],
-    "target": [
-      36.4,
-      -5.1,
-      17.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.4907,
-    "exposure": 1.15,
-    "pixels": [
-      1525,
-      1023
-    ],
-    "estimated": true,
-    "note": "Basement bath looking NW. A greige shaker vanity with a quartz top and a black-framed rounded mirror is on the left, the toilet is at centre, and a long blank painted wall with a grab bar fills the right — the wall whose 132-to-194 gradient set the \"a wall is never a flat wash\" rule. Beige tile floor. ~14.6 mm."
-  },
-  "basement_view_1": {
-    "photo": "basement_view_1.png",
-    "room": "basement-rec",
-    "level": "basement",
-    "pos": [
-      33,
-      -5.1,
-      42.6
-    ],
-    "target": [
-      6,
-      -5.1,
-      26.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5005,
-    "exposure": 1.15,
-    "pixels": [
-      1529,
-      1019
-    ],
-    "estimated": true,
-    "note": "Basement rec room from the SE corner looking WNW. Two slim wood lally columns stand at centre, a deep dropped soffit runs across the ceiling behind them, a white door is at the left edge, and the dark-floored gym opening shows in the middle distance. Beige carpet with vacuum swirls, 7'6\" ceiling. ~14.6 mm; camera only 3.90 ft up."
-  },
-  "basement_view_2_looking_at_workout_room": {
-    "photo": "basement_view_2_looking_at_workout_room.png",
-    "room": "basement-gym",
-    "level": "basement",
-    "pos": [
-      34.5,
-      -5.1,
-      41.6
-    ],
-    "target": [
-      6.5,
-      -5.1,
-      21.8
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5,
-    "exposure": 1.15,
-    "pixels": [
-      1530,
-      1020
-    ],
-    "estimated": true,
-    "note": "From the stair end of the rec room looking WNW at the workout room. The gym's mirrored wall and dark rubber floor are visible through a wide opening in the left third, two wood columns stand centre, the stair rail and a white six-panel door are on the right, and the dropped soffit crosses the whole ceiling. ~14.6 mm."
-  },
-  "basement_view_3": {
-    "photo": "basement_view_3.png",
-    "room": "basement-rec",
-    "level": "basement",
-    "pos": [
-      3.2,
-      -5.1,
-      42.8
-    ],
-    "target": [
-      30,
-      -5.1,
-      27.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5044,
-    "exposure": 1.15,
-    "pixels": [
-      1530,
-      1017
-    ],
-    "estimated": true,
-    "note": "Rec room from the SW corner looking ENE. A wide opening at the far left leads to the gym and the stair, two wood columns and a long dropped beam run across the centre, and a pair of white doors plus a black-hardware door sit on the far and right walls. ~14.6 mm."
-  },
-  "basement_view_4": {
-    "photo": "basement_view_4.png",
-    "room": "basement-rec",
-    "level": "basement",
-    "pos": [
-      5,
-      -5.1,
-      26.6
-    ],
-    "target": [
-      31.6,
-      -5.1,
-      40.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.4995,
-    "exposure": 1.15,
-    "pixels": [
-      1525,
-      1017
-    ],
-    "estimated": true,
-    "note": "Rec room looking SE. A white six-panel door with black lever hardware fills the left third, two wood columns stand at centre, the soffit steps down diagonally overhead, and two more white doors are on the far wall. Beige carpet. ~14.6 mm."
-  },
-  "basement_workout_room": {
-    "photo": "basement_workout_room.png",
-    "room": "basement-gym",
-    "level": "basement",
-    "pos": [
-      11.6,
-      -5.1,
-      22.9
-    ],
-    "target": [
-      2.2,
-      -5.1,
-      13.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.4941,
-    "exposure": 1.15,
-    "pixels": [
-      1530,
-      1024
-    ],
-    "estimated": true,
-    "note": "Workout room looking NW. A full-height mirror wall covers the left, the ceiling is a wood-slat lay-in grid with a lit 2x4 troffer, a white six-panel door is on the right, and the floor is dark speckled rubber with a light carpet border. This frame gave the measured 7.49 ft basement ceiling. ~14.6 mm."
-  },
-  "bathroom_first_floor_1": {
-    "photo": "bathroom_first_floor_1.png",
-    "room": "bath-first",
-    "level": "first",
-    "pos": [
-      20.8,
-      4,
-      43.9
-    ],
-    "target": [
-      20.8,
-      4,
-      35.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5039,
-    "exposure": 1.15,
-    "pixels": [
-      1525,
-      1014
-    ],
-    "estimated": true,
-    "note": "First-floor bath looking down its long axis. Beige porcelain shower with a frameless glass door and a small awning window on the left, toilet centre-left, and a long quartz-top vanity with an undermount sink, chrome faucet and a big black-framed rounded mirror on the right. Three-lamp bar light over the mirror is on. ~14.6 mm."
-  },
-  "bathroom_second_floor_1": {
-    "photo": "bathroom_second_floor_1.png",
-    "room": "bath-second",
-    "level": "second",
-    "pos": [
-      13.1,
-      13.55,
-      31.9
-    ],
-    "target": [
-      14.6,
-      13.55,
-      42.6
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.4966,
-    "exposure": 1.15,
-    "pixels": [
-      1531,
-      1023
-    ],
-    "estimated": true,
-    "note": "Second-floor bath looking down the vanity. A long quartz double vanity with two undermount sinks, matte-black faucets and two black-framed mirrors runs away along the left, black bar lights above, and a doorway on the right opens into the tub/shower compartment with its grey-veined marble surround and a window over the tub. Marble-look tile floor. ~14.6 mm."
-  },
-  "bedroom_first_floor_1": {
-    "photo": "bedroom_first_floor_1.png",
-    "room": "bed-first",
-    "level": "first",
-    "pos": [
-      16.8,
-      4,
-      38.4
-    ],
-    "target": [
-      1.2,
-      4,
-      37.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5059,
-    "exposure": 1.15,
-    "pixels": [
-      1530,
-      1016
-    ],
-    "estimated": true,
-    "note": "First-floor bedroom looking west. A run of tall plantation-shuttered windows fills the left wall with the front lawn and street beyond, a smaller shuttered window sits high on the far wall right of centre, and hard shutter-slat sun stripes fall across the red-oak floor. Recessed cans in the ceiling. ~14.6 mm."
-  },
-  "bedroom_first_floor_2": {
-    "photo": "bedroom_first_floor_2.png",
-    "room": "bed-first",
-    "level": "first",
-    "pos": [
-      2,
-      4,
-      42
-    ],
-    "target": [
-      17.4,
-      4,
-      36.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.4985,
-    "exposure": 1.15,
-    "pixels": [
-      1521,
-      1015
-    ],
-    "estimated": true,
-    "note": "Same bedroom from the opposite corner looking east. Six-panel bypass closet doors fill the left third, the hall door stands open at centre-right showing the hallway beyond, blank wall right, shutter-slat sun stripes on the oak floor again. ~14.6 mm."
-  },
-  "bedroom_second_floor_1": {
-    "photo": "bedroom_second_floor_1.png",
-    "room": "bed-second",
-    "level": "second",
-    "pos": [
-      38.4,
-      13.55,
-      15.6
-    ],
-    "target": [
-      30.2,
-      13.55,
-      5.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5025,
-    "exposure": 1.15,
-    "pixels": [
-      1528,
-      1017
-    ],
-    "estimated": true,
-    "note": "Second-floor bedroom (12'5\" x 12'9\") looking NW. A three-lite casement window sits left of centre in the far wall with dense green foliage outside, a black caged-fan flush fixture hangs at centre-top, closet edge at the right, beige carpet, plain painted walls. Very low chroma (mean 8.4). ~14.6 mm."
-  },
-  "bedroom_second_floor_kid-1_1": {
-    "photo": "bedroom_second_floor_kid-1_1.png",
-    "room": "bed-second",
-    "level": "second",
-    "pos": [
-      1.4,
-      13.55,
-      32.4
-    ],
-    "target": [
-      9.2,
-      13.55,
-      43.6
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5079,
-    "exposure": 1.15,
-    "pixels": [
-      1529,
-      1014
-    ],
-    "estimated": true,
-    "note": "The 10'10\" x 13'2\" bedroom looking SE toward the front of the house. A three-lite casement in the right half looks out over the street and a neighbour's roof, the black caged-fan flush fixture is at top centre-left, and the rest is bare wall and beige carpet. The lowest-chroma frame in the set. ~14.6 mm."
-  },
-  "bedroom_second_floor_kid-2_1": {
-    "photo": "bedroom_second_floor_kid-2_1.png",
-    "room": "bed-second",
-    "level": "second",
-    "pos": [
-      18.4,
-      13.55,
-      32.4
-    ],
-    "target": [
-      27,
-      13.55,
-      43
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5054,
-    "exposure": 1.15,
-    "pixels": [
-      1531,
-      1017
-    ],
-    "estimated": true,
-    "note": "The 13'2\" x 13'2\" bedroom looking SE. A wood-stained double casement sits right of centre in the far wall with tree canopy outside, the black caged-fan fixture is at top centre, floor and wall vents visible, beige carpet. ~14.6 mm."
-  },
-  "dining_room": {
-    "photo": "dining_room.png",
-    "room": "dining",
-    "level": "first",
-    "pos": [
-      39.4,
-      4,
-      10.4
-    ],
-    "target": [
-      28.6,
-      4,
-      1.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5064,
-    "exposure": 1.15,
-    "pixels": [
-      1526,
-      1013
-    ],
-    "estimated": true,
-    "note": "Dining room from its SE corner looking NW. Canted bay of three casement windows fills the left wall with a big tree just outside, a shallow recessed niche on the far wall right of centre, brass-and-opal sputnik chandelier centre-top, crown moulding, red-oak floor. ~14.6 mm; the ceiling and the full window sill both fit."
-  },
-  "exterior_view_of_front_door": {
-    "photo": "exterior_view_of_front_door.png",
-    "room": "exterior-entry",
-    "level": "exterior",
-    "pos": [
-      39.5,
-      4.3,
-      56
-    ],
-    "target": [
-      33.7,
-      4.3,
-      45.6
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.501,
-    "exposure": 0.95,
-    "pixels": [
-      1531,
-      1020
-    ],
-    "estimated": true,
-    "note": "Close three-quarter of the entry from the bluestone walk, a few feet out. Black door with its round porthole light and coir mat, sidelight with plantation shutters right, heavy timber post and the deep soffit overhead, clipped privet blob left. Wider than the elevation shots (~17 mm) because of the short stand-off; verticals plumb."
-  },
-  "family_room_1": {
-    "photo": "family_room_1.png",
-    "room": "family",
-    "level": "first",
-    "pos": [
-      43.5,
-      4,
-      22
-    ],
-    "target": [
-      56,
-      4,
-      8.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5094,
-    "exposure": 1.15,
-    "pixels": [
-      1526,
-      1011
-    ],
-    "estimated": true,
-    "note": "The plan's LIVING ROOM (18'11\" x 18'2\"), shot diagonally into the NE corner. Ledgestone corner fireplace dead centre with a lit gas fire and a black cylindrical flue rising to the ceiling, a window either side of it, a tall window on the left wall, another on the right. This is the frame used for the two-vanishing-point focal-length calibration: f = 625 px, vFOV 78.6°."
-  },
-  "family_room_2": {
-    "photo": "family_room_2.png",
-    "room": "family",
-    "level": "first",
-    "pos": [
-      43,
-      4,
-      14.5
-    ],
-    "target": [
-      59.6,
-      4,
-      15.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5049,
-    "exposure": 1.15,
-    "pixels": [
-      1529,
-      1016
-    ],
-    "estimated": true,
-    "note": "Same room looking east. Ledgestone fireplace with its raised stone hearth and black flue at the left edge, a tall window beyond it, then the wet bar — black cabinets, wine fridge, vertical wood slat panel — at centre-right, and a long blank wall filling the right. ~14.6 mm."
-  },
-  "family_room_3": {
-    "photo": "family_room_3.png",
-    "room": "family",
-    "level": "first",
-    "pos": [
-      46,
-      4,
-      21.6
-    ],
-    "target": [
-      46.6,
-      4,
-      5
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5039,
-    "exposure": 1.15,
-    "pixels": [
-      1525,
-      1014
-    ],
-    "estimated": true,
-    "note": "Same room looking north. The cased opening back to the kitchen hall with its one-step change in floor level is at the far left, blank wall and a narrow window centre, and the ledgestone fireplace with its clerestory window and black flue occupies the right third. ~14.6 mm."
-  },
-  "foyer_view_of_front_door": {
-    "photo": "foyer_view_of_front_door.png",
-    "room": "foyer",
-    "level": "first",
-    "pos": [
-      31.5,
-      4,
-      30.2
-    ],
-    "target": [
-      32.6,
-      4,
-      42.6
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5339,
-    "exposure": 1.15,
-    "pixels": [
-      1514,
-      987
-    ],
-    "estimated": true,
-    "note": "Inside the foyer looking straight at the front door (+Z, street side). Black door with its round obscure-glass porthole dead centre-left, tall shuttered sidelight windows filling the left third and a second shuttered window right of the door, six-panel bypass closet doors on the right wall, red-oak floor. Very wide (~14.6 mm) — the whole door wall plus a closet wall in one frame. This PNG is 1514x987, the widest aspect of the interiors (1.534)."
-  },
-  "front_leftside_of_house": {
-    "photo": "front_leftside_of_house.png",
-    "room": "exterior-front",
-    "level": "exterior",
-    "pos": [
-      -14,
-      4.3,
-      82
-    ],
-    "target": [
-      22,
-      4.3,
-      45
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.5,
-    "exposure": 0.95,
-    "pixels": [
-      1527,
-      1018
-    ],
-    "estimated": true,
-    "note": "Three-quarter view from the front-left (west) corner of the lot. Pine boughs frame the top-left, the two-storey mass runs away to the right toward the garage and driveway. Wide-ish but not extreme (~19 mm); strong raking afternoon sun on the siding, deep shadows on the lawn."
-  },
-  "front_rightside_of_house": {
-    "photo": "front_rightside_of_house.png",
-    "room": "exterior-front",
-    "level": "exterior",
-    "pos": [
-      74,
-      4.3,
-      78
-    ],
-    "target": [
-      40,
-      4.3,
-      45
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.5119,
-    "exposure": 0.95,
-    "pixels": [
-      1527,
-      1010
-    ],
-    "estimated": true,
-    "note": "Three-quarter view from the front-right (east), standing on/near the driveway apron. Garage door dominates the right half, entry recess and porthole window centre-left, concrete drive sweeps in from the bottom-left. ~19 mm equiv."
-  },
-  "hallway_top_of_stairs_looking_down_at_front_door": {
-    "photo": "hallway_top_of_stairs_looking_down_at_front_door.png",
-    "room": "upper-hall",
-    "level": "second",
-    "pos": [
-      38.6,
-      13.55,
-      30
-    ],
-    "target": [
-      30.6,
-      13.55,
-      42
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5039,
-    "exposure": 1.15,
-    "pixels": [
-      1528,
-      1016
-    ],
-    "estimated": true,
-    "note": "From the top of the stair looking SW down into the two-storey entry. Sculptural skylight slots cut across the vaulted ceiling, the round porthole window and the brass dandelion chandelier are at the left, the black front door and its shuttered sidelights are below-left, and the oak-capped rail with black square balusters runs from centre to the right edge. ~14.6 mm; camera 4.05 ft above the second floor."
-  },
-  "kitchen_breakfast_nook": {
-    "photo": "kitchen_breakfast_nook.png",
-    "room": "breakfast-nook",
-    "level": "first",
-    "pos": [
-      13.6,
-      4,
-      2.4
-    ],
-    "target": [
-      26,
-      4,
-      15.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5099,
-    "exposure": 1.15,
-    "pixels": [
-      1528,
-      1012
-    ],
-    "estimated": true,
-    "note": "Breakfast nook looking SE toward the kitchen. Bypass closet doors on the left wall, a white boxed column just left of centre, a soffit crossing the ceiling, and the kitchen island and cabinets small in the middle distance. Red-oak floor with a bright sun patch. ~14.6 mm."
-  },
-  "kitchen_view_1": {
-    "photo": "kitchen_view_1.png",
-    "room": "kitchen",
-    "level": "first",
-    "pos": [
-      29.9,
-      4,
-      27.6
-    ],
-    "target": [
-      14.2,
-      4,
-      19.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.522,
-    "exposure": 1.15,
-    "pixels": [
-      1522,
-      1000
-    ],
-    "estimated": true,
-    "note": "Kitchen from its east end looking WNW down the L. Painted greige wall cabinets wrap the left and far walls, a plaster-look hood over the slide-in gas range left of centre, black gooseneck faucet and dishwasher on the far run, panelled counter-depth fridge and a tall pantry cabinet at the right edge, white-oak island with quartz top low-right, two brass-and-black pendants. Very wide (~14.6 mm): ceiling cans at the top edge and the island counter cropped at the bottom."
-  },
-  "kitchen_view_2": {
-    "photo": "kitchen_view_2.png",
-    "room": "kitchen",
-    "level": "first",
-    "pos": [
-      29.9,
-      4,
-      19.4
-    ],
-    "target": [
-      14.2,
-      4,
-      28.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5069,
-    "exposure": 1.15,
-    "pixels": [
-      1519,
-      1008
-    ],
-    "estimated": true,
-    "note": "Kitchen from the north-east corner looking WSW. The island is the foreground mass at centre-left, the run with sink and range is on the right, and a wide cased opening on the left leads through to a hall with a white six-panel door. Pendants hang at centre. Same ~14.6 mm as the rest of the interiors."
-  },
-  "kitchen_view_3": {
-    "photo": "kitchen_view_3.png",
-    "room": "kitchen",
-    "level": "first",
-    "pos": [
-      29.4,
-      4,
-      27.9
-    ],
-    "target": [
-      13.6,
-      4,
-      20.8
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5119,
-    "exposure": 1.15,
-    "pixels": [
-      1527,
-      1010
-    ],
-    "estimated": true,
-    "note": "A step left of kitchen_view_1 and slightly more frontal on the range wall. Full L of upper cabinets, hood centred, quartz slab backsplash, under-cabinet strips on, island and the panelled fridge / tall pantry stack at the right. ~14.6 mm."
-  },
-  "kitchen_view_5": {
-    "photo": "kitchen_view_5.png",
-    "room": "kitchen",
-    "level": "first",
-    "pos": [
-      15.5,
-      4,
-      27.6
-    ],
-    "target": [
-      24.5,
-      4,
-      7
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5054,
-    "exposure": 1.15,
-    "pixels": [
-      1525,
-      1013
-    ],
-    "estimated": true,
-    "note": "From the kitchen sink corner looking NE across the island toward the glazed rear wall. Sink and dishwasher cropped in the near left foreground, panelled fridge behind, island with its built-in microwave drawer centre, and the far wall of sliding glass with the deck and back lawn burning through at the right. The window plate stays fully legible — this is the shot that proves the HDR merge."
-  },
-  "master_bedroom_1": {
-    "photo": "master_bedroom_1.png",
-    "room": "primary-bed",
-    "level": "second",
-    "pos": [
-      11.4,
-      13.55,
-      26.4
-    ],
-    "target": [
-      4.2,
-      13.55,
-      6.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5049,
-    "exposure": 1.15,
-    "pixels": [
-      1532,
-      1018
-    ],
-    "estimated": true,
-    "note": "Primary bedroom (11'7\" x 21'7\") from the south end looking north. The full-height vertical wood slat feature wall runs away down the entire left side, two white doors stand at the far end, a window shows at the right edge, beige carpet, one small sun patch. Second calibration frame: f = 631 px. ~14.6 mm."
-  },
-  "master_bedroom_2": {
-    "photo": "master_bedroom_2.png",
-    "room": "primary-bed",
-    "level": "second",
-    "pos": [
-      8.2,
-      13.55,
-      25.6
-    ],
-    "target": [
-      7.2,
-      13.55,
-      3.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5069,
-    "exposure": 1.15,
-    "pixels": [
-      1534,
-      1018
-    ],
-    "estimated": true,
-    "note": "Primary bedroom looking north from a step east of view 1. A small double-casement window on the left wall frames a neighbour's roof and brick, the sliding glass door to the wrap-around sunroom is at centre-right with the deck decking visible through it, and a tall wood wardrobe/built-in fills the right edge. Two rectangular sun patches on the carpet. ~14.6 mm."
-  },
-  "master_bedroom_3": {
-    "photo": "master_bedroom_3.png",
-    "room": "primary-bed",
-    "level": "second",
-    "pos": [
-      24,
-      13.55,
-      26.6
-    ],
-    "target": [
-      15.4,
-      13.55,
-      21
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5109,
-    "exposure": 1.15,
-    "pixels": [
-      1529,
-      1012
-    ],
-    "estimated": true,
-    "note": "The carpeted vestibule/closet end looking into the primary bath. Plain white walls on three sides, a deep light-well with a round flush fixture in the soffit above, and a tall cased opening at centre-right through which the bath's wood vanity and slat wall are visible against dark tile. ~14.6 mm."
-  },
-  "master_bedroom_bathroom_view_1": {
-    "photo": "master_bedroom_bathroom_view_1.png",
-    "room": "primary-bath",
-    "level": "second",
-    "pos": [
-      25,
-      13.55,
-      18
-    ],
-    "target": [
-      14.6,
-      13.55,
-      9
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5118,
-    "exposure": 1.15,
-    "pixels": [
-      1533,
-      1014
-    ],
-    "estimated": true,
-    "note": "Primary bath looking NW. A sliding glass door to the sunroom fills the left third with trees and lawn fully legible through it, the brown-tile shower with frameless glass and the drop-in tub occupy the centre, the WC door is open on the right, and a gabled skylight well opens the ceiling above. ~14.6 mm."
-  },
-  "master_bedroom_bathroom_view_2": {
-    "photo": "master_bedroom_bathroom_view_2.png",
-    "room": "primary-bath",
-    "level": "second",
-    "pos": [
-      22.5,
-      13.55,
-      18.6
-    ],
-    "target": [
-      19.2,
-      13.55,
-      6.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.498,
-    "exposure": 1.15,
-    "pixels": [
-      1519,
-      1014
-    ],
-    "estimated": true,
-    "note": "Primary bath looking north along the vanity wall. A white door on the far left opens onto the carpeted bedroom, a white boxed column stands left of centre, the long wood double vanity with black stone top, backlit slat wall and swing-arm magnifying mirror runs across the centre, and the sunroom slider is at the right with a second skylight well overhead. ~14.6 mm."
-  },
-  "master_bedroom_wrap-around_indoor_patio_from_bedroom_to_bathroom": {
-    "photo": "master_bedroom_wrap-around_indoor_patio_from_bedroom_to_bathroom.png",
-    "room": "sunroom",
-    "level": "second",
-    "pos": [
-      25,
-      13.55,
-      3.2
-    ],
-    "target": [
-      1.2,
-      13.55,
-      3
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5074,
-    "exposure": 1.15,
-    "pixels": [
-      1533,
-      1017
-    ],
-    "estimated": true,
-    "note": "The glazed wrap-around sunroom (24'9\" x 4'11\") looking west down its length. Dark-framed floor-to-ceiling glazing runs the full right side onto the back yard, the ribbed dark decking floor recedes to a vanishing point, a small window and a slider are at the far end, and another slider is cropped at the left edge. Extremely wide feel (~14.6 mm) because the corridor is under 5 ft deep."
-  },
-  "mudroom_1": {
-    "photo": "mudroom_1.png",
-    "room": "mudroom",
-    "level": "first",
-    "pos": [
-      11.6,
-      4,
-      27.8
-    ],
-    "target": [
-      2.2,
-      4,
-      21.4
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5059,
-    "exposure": 1.15,
-    "pixels": [
-      1530,
-      1016
-    ],
-    "estimated": true,
-    "note": "The plan's LAUNDRY, from the SE corner looking NW. A cased opening on the left shows red-oak floor beyond, teal-blue shaker wall cabinets over the white LG washer and dryer fill the centre, and a white exterior door with an obscure-glass light is on the right. Light vinyl plank floor, opal flush mount above. Cool white balance — the only cool frame in the set. ~14.6 mm."
-  },
-  "straight_on_view_of_house_from_street": {
-    "photo": "straight_on_view_of_house_from_street.png",
-    "room": "exterior-front",
-    "level": "exterior",
-    "pos": [
-      30,
-      4.3,
-      96
-    ],
-    "target": [
-      30,
-      4.3,
-      45
-    ],
-    "fovV": 64,
-    "shift": 0,
-    "aspect": 1.4936,
-    "exposure": 0.95,
-    "pixels": [
-      1525,
-      1021
-    ],
-    "estimated": true,
-    "note": "Square-on front elevation from the middle of the street. Two-storey gray lap-siding entry block centred with its round porthole window; one-storey garage wing right; the big multi-stem front tree fills the left third; mown lawn with mower stripes across the bottom. Moderately wide (~19 mm equiv), horizon dead centre, whole house plus sky and both neighbours in frame."
-  },
-  "view_from_breakfast_nook_looking_out_at_backyard_patio": {
-    "photo": "view_from_breakfast_nook_looking_out_at_backyard_patio.png",
-    "room": "breakfast-nook",
-    "level": "first",
-    "pos": [
-      25.5,
-      4,
-      14.6
-    ],
-    "target": [
-      8,
-      4,
-      2.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5039,
-    "exposure": 1.15,
-    "pixels": [
-      1525,
-      1014
-    ],
-    "estimated": true,
-    "note": "From the nook looking WNW into the family-room end. The rear glazed wall runs across the left half with the lawn and deck legible through it, a white boxed column stands at centre, a white six-panel door and blank wall to the right. Ceiling cans in two rows. ~14.6 mm."
-  },
-  "view_from_kitchen_of_living_room_looking_out_to_backyard": {
-    "photo": "view_from_kitchen_of_living_room_looking_out_to_backyard.png",
-    "room": "living",
-    "level": "first",
-    "pos": [
-      13.4,
-      4,
-      17
-    ],
-    "target": [
-      4,
-      4,
-      1.2
-    ],
-    "fovV": 78.5,
-    "shift": 0,
-    "aspect": 1.5099,
-    "exposure": 1.15,
-    "pixels": [
-      1525,
-      1010
-    ],
-    "estimated": true,
-    "note": "The plan's FAMILY ROOM (12'1\" x 19'8\"), photographed from the kitchen side looking NW at the rear window wall. White boxed support column just left of centre, sliding glass and a French door with its own sidelight to the right, a small awning window on the left wall, red-oak floor, one step down at the near edge. ~14.6 mm."
+ "Kitchen_view_4": {
+  "photo": "Kitchen_view_4.png",
+  "room": "kitchen",
+  "level": "first",
+  "pos": [
+   24,
+   4,
+   4.5
+  ],
+  "target": [
+   15.5,
+   4,
+   24
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5119,
+  "exposure": 1.15,
+  "pixels": [
+   1527,
+   1010
+  ],
+  "estimated": true,
+  "note": "From the breakfast-nook side looking back SSW at the kitchen. The kitchen occupies only the left third \u2014 pendants, hood, fridge, island \u2014 while the right two-thirds is empty open floor, a white boxed structural column and a basement-style awning window. Emphasises how open the plan is. ~14.6 mm."
+ },
+ "backyard_1": {
+  "photo": "backyard_1.png",
+  "room": "exterior-rear",
+  "level": "exterior",
+  "pos": [
+   -16,
+   4.3,
+   -46
+  ],
+  "target": [
+   26,
+   4.3,
+   -8
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.5074,
+  "exposure": 0.515,
+  "pixels": [
+   1530,
+   1015
+  ],
+  "estimated": true,
+  "note": "Rear yard from the far west corner looking ENE. Deep lawn fills the lower half, house and deck sit in the right third, evergreens close the left edge, the stacked-limestone planter wall and fire-pit terrace read at centre-right. ~19 mm equiv, heavy dappled shade.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
   }
+ },
+ "backyard_fire_pit_1": {
+  "photo": "backyard_fire_pit_1.png",
+  "room": "fire-pit",
+  "level": "exterior",
+  "pos": [
+   26,
+   3.95,
+   -30
+  ],
+  "target": [
+   28,
+   3.95,
+   -5
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.4567,
+  "exposure": 0.515,
+  "pixels": [
+   1311,
+   900
+  ],
+  "estimated": true,
+  "note": "From the lawn just outside the fire-pit terrace looking back at the house. Stacked-limestone seat wall arcs across the bottom third, steel fire bowl with mesh screen lit at centre-right, deck and full-height rear glazing behind. This PNG is 1311x900 (aspect 1.457) \u2014 the narrowest crop in the set.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "backyard_fire_pit_2": {
+  "photo": "backyard_fire_pit_2.png",
+  "room": "fire-pit",
+  "level": "exterior",
+  "pos": [
+   18,
+   3.95,
+   -32
+  ],
+  "target": [
+   26,
+   3.95,
+   -7
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.5005,
+  "exposure": 0.515,
+  "pixels": [
+   1514,
+   1009
+  ],
+  "estimated": true,
+  "note": "A few feet west of fire_pit_1 and a step back, same subject: seat wall foreground, lit fire bowl left of centre, house and deck behind, flagstone path running off to the right.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "backyard_fire_pit_3": {
+  "photo": "backyard_fire_pit_3.png",
+  "room": "fire-pit",
+  "level": "exterior",
+  "pos": [
+   46,
+   3.95,
+   -8
+  ],
+  "target": [
+   20,
+   3.95,
+   -34
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.5015,
+  "exposure": 0.515,
+  "pixels": [
+   1527,
+   1017
+  ],
+  "estimated": true,
+  "note": "Reverse angle: standing east of the terrace looking WSW away from the house. Irregular flagstone paving fills the foreground, lit fire bowl and the low seat wall at centre-left, lawn, fence and a neighbour shed in the middle distance. ~19 mm.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "backyard_mulch_grass_1": {
+  "photo": "backyard_mulch_grass_1.png",
+  "room": "exterior-rear",
+  "level": "exterior",
+  "pos": [
+   -10,
+   4.3,
+   -58
+  ],
+  "target": [
+   24,
+   4.3,
+   -14
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.5079,
+  "exposure": 0.515,
+  "pixels": [
+   1532,
+   1016
+  ],
+  "estimated": true,
+  "note": "From the NW corner of the rear lot across the river-cobble-edged mulch bed and the kidney of lawn toward the house. Trees on the left, mulch and cobble edging sweeping through the foreground, house small in the middle distance. ~19 mm equiv.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "backyard_mulch_stone_steps": {
+  "photo": "backyard_mulch_stone_steps.png",
+  "room": "exterior-rear",
+  "level": "exterior",
+  "pos": [
+   -8,
+   4.3,
+   -30
+  ],
+  "target": [
+   -2.5,
+   4.3,
+   -8
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.5049,
+  "exposure": 0.515,
+  "pixels": [
+   1529,
+   1016
+  ],
+  "estimated": true,
+  "note": "Tight along the west flank of the house looking back toward the deck. Siding, soffit and a condenser on the left edge, a line of square stepping stones running through mulch up the centre, multi-stem trees on the right. Short stand-off makes it read wide (~17 mm).",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "backyard_patio_1": {
+  "photo": "backyard_patio_1.png",
+  "room": "deck-patio",
+  "level": "exterior",
+  "pos": [
+   20,
+   4.8,
+   -4
+  ],
+  "target": [
+   22,
+   4.8,
+   -40
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.4941,
+  "exposure": 0.515,
+  "pixels": [
+   1527,
+   1022
+  ],
+  "estimated": true,
+  "note": "Standing on the main deck looking away from the house. Gray composite deck boards run left-to-right across the whole bottom half, two curved bench seats, flagstone landing and the mown lawn beyond, big trunks rising through the frame. ~18-19 mm equiv, eye level above deck.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "backyard_patio_2": {
+  "photo": "backyard_patio_2.png",
+  "room": "deck-patio",
+  "level": "exterior",
+  "pos": [
+   28,
+   4.8,
+   -3
+  ],
+  "target": [
+   8,
+   4.8,
+   -26
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.5039,
+  "exposure": 0.515,
+  "pixels": [
+   1528,
+   1016
+  ],
+  "estimated": true,
+  "note": "On the deck near the east black-aluminium picket rail, looking WNW. Rail and hedge on the left, deck boards and the notch around a tree through the centre, benches right, lawn and neighbours beyond. ~18-19 mm.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "backyard_straight_on_view_of_house": {
+  "photo": "backyard_straight_on_view_of_house.png",
+  "room": "exterior-rear",
+  "level": "exterior",
+  "pos": [
+   22,
+   4.3,
+   -46
+  ],
+  "target": [
+   22,
+   4.3,
+   -2
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.621,
+  "exposure": 0.515,
+  "pixels": [
+   1433,
+   884
+  ],
+  "estimated": true,
+  "note": "Square-on rear elevation from the middle of the back lawn. Full-height glazing on the two-storey block centre-right, low wing and chimney left, the two-level gray deck across the base. Two big trunks frame left and right. Note this PNG is the odd one: 1433x884, aspect 1.621, i.e. cropped tighter top and bottom than the rest of the set.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "basement_bathroom": {
+  "photo": "basement_bathroom.png",
+  "room": "basement-bath",
+  "level": "basement",
+  "pos": [
+   39.2,
+   -5.1,
+   23.4
+  ],
+  "target": [
+   36.4,
+   -5.1,
+   17.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.4907,
+  "exposure": 1.15,
+  "pixels": [
+   1525,
+   1023
+  ],
+  "estimated": true,
+  "note": "Basement bath looking NW. A greige shaker vanity with a quartz top and a black-framed rounded mirror is on the left, the toilet is at centre, and a long blank painted wall with a grab bar fills the right \u2014 the wall whose 132-to-194 gradient set the \"a wall is never a flat wash\" rule. Beige tile floor. ~14.6 mm."
+ },
+ "basement_view_1": {
+  "photo": "basement_view_1.png",
+  "room": "basement-rec",
+  "level": "basement",
+  "pos": [
+   33,
+   -5.1,
+   42.6
+  ],
+  "target": [
+   6,
+   -5.1,
+   26.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5005,
+  "exposure": 1.15,
+  "pixels": [
+   1529,
+   1019
+  ],
+  "estimated": true,
+  "note": "Basement rec room from the SE corner looking WNW. Two slim wood lally columns stand at centre, a deep dropped soffit runs across the ceiling behind them, a white door is at the left edge, and the dark-floored gym opening shows in the middle distance. Beige carpet with vacuum swirls, 7'6\" ceiling. ~14.6 mm; camera only 3.90 ft up."
+ },
+ "basement_view_2_looking_at_workout_room": {
+  "photo": "basement_view_2_looking_at_workout_room.png",
+  "room": "basement-gym",
+  "level": "basement",
+  "pos": [
+   34.5,
+   -5.1,
+   41.6
+  ],
+  "target": [
+   6.5,
+   -5.1,
+   21.8
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5,
+  "exposure": 1.15,
+  "pixels": [
+   1530,
+   1020
+  ],
+  "estimated": true,
+  "note": "From the stair end of the rec room looking WNW at the workout room. The gym's mirrored wall and dark rubber floor are visible through a wide opening in the left third, two wood columns stand centre, the stair rail and a white six-panel door are on the right, and the dropped soffit crosses the whole ceiling. ~14.6 mm."
+ },
+ "basement_view_3": {
+  "photo": "basement_view_3.png",
+  "room": "basement-rec",
+  "level": "basement",
+  "pos": [
+   3.2,
+   -5.1,
+   42.8
+  ],
+  "target": [
+   30,
+   -5.1,
+   27.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5044,
+  "exposure": 1.15,
+  "pixels": [
+   1530,
+   1017
+  ],
+  "estimated": true,
+  "note": "Rec room from the SW corner looking ENE. A wide opening at the far left leads to the gym and the stair, two wood columns and a long dropped beam run across the centre, and a pair of white doors plus a black-hardware door sit on the far and right walls. ~14.6 mm."
+ },
+ "basement_view_4": {
+  "photo": "basement_view_4.png",
+  "room": "basement-rec",
+  "level": "basement",
+  "pos": [
+   5,
+   -5.1,
+   26.6
+  ],
+  "target": [
+   31.6,
+   -5.1,
+   40.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.4995,
+  "exposure": 1.15,
+  "pixels": [
+   1525,
+   1017
+  ],
+  "estimated": true,
+  "note": "Rec room looking SE. A white six-panel door with black lever hardware fills the left third, two wood columns stand at centre, the soffit steps down diagonally overhead, and two more white doors are on the far wall. Beige carpet. ~14.6 mm."
+ },
+ "basement_workout_room": {
+  "photo": "basement_workout_room.png",
+  "room": "basement-gym",
+  "level": "basement",
+  "pos": [
+   11.6,
+   -5.1,
+   22.9
+  ],
+  "target": [
+   2.2,
+   -5.1,
+   13.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.4941,
+  "exposure": 1.15,
+  "pixels": [
+   1530,
+   1024
+  ],
+  "estimated": true,
+  "note": "Workout room looking NW. A full-height mirror wall covers the left, the ceiling is a wood-slat lay-in grid with a lit 2x4 troffer, a white six-panel door is on the right, and the floor is dark speckled rubber with a light carpet border. This frame gave the measured 7.49 ft basement ceiling. ~14.6 mm."
+ },
+ "bathroom_first_floor_1": {
+  "photo": "bathroom_first_floor_1.png",
+  "room": "bath-first",
+  "level": "first",
+  "pos": [
+   20.8,
+   4,
+   43.9
+  ],
+  "target": [
+   20.8,
+   4,
+   35.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5039,
+  "exposure": 1.15,
+  "pixels": [
+   1525,
+   1014
+  ],
+  "estimated": true,
+  "note": "First-floor bath looking down its long axis. Beige porcelain shower with a frameless glass door and a small awning window on the left, toilet centre-left, and a long quartz-top vanity with an undermount sink, chrome faucet and a big black-framed rounded mirror on the right. Three-lamp bar light over the mirror is on. ~14.6 mm."
+ },
+ "bathroom_second_floor_1": {
+  "photo": "bathroom_second_floor_1.png",
+  "room": "bath-second",
+  "level": "second",
+  "pos": [
+   13.1,
+   13.55,
+   31.9
+  ],
+  "target": [
+   14.6,
+   13.55,
+   42.6
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.4966,
+  "exposure": 1.15,
+  "pixels": [
+   1531,
+   1023
+  ],
+  "estimated": true,
+  "note": "Second-floor bath looking down the vanity. A long quartz double vanity with two undermount sinks, matte-black faucets and two black-framed mirrors runs away along the left, black bar lights above, and a doorway on the right opens into the tub/shower compartment with its grey-veined marble surround and a window over the tub. Marble-look tile floor. ~14.6 mm."
+ },
+ "bedroom_first_floor_1": {
+  "photo": "bedroom_first_floor_1.png",
+  "room": "bed-first",
+  "level": "first",
+  "pos": [
+   16.8,
+   4,
+   38.4
+  ],
+  "target": [
+   1.2,
+   4,
+   37.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5059,
+  "exposure": 1.15,
+  "pixels": [
+   1530,
+   1016
+  ],
+  "estimated": true,
+  "note": "First-floor bedroom looking west. A run of tall plantation-shuttered windows fills the left wall with the front lawn and street beyond, a smaller shuttered window sits high on the far wall right of centre, and hard shutter-slat sun stripes fall across the red-oak floor. Recessed cans in the ceiling. ~14.6 mm."
+ },
+ "bedroom_first_floor_2": {
+  "photo": "bedroom_first_floor_2.png",
+  "room": "bed-first",
+  "level": "first",
+  "pos": [
+   2,
+   4,
+   42
+  ],
+  "target": [
+   17.4,
+   4,
+   36.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.4985,
+  "exposure": 1.15,
+  "pixels": [
+   1521,
+   1015
+  ],
+  "estimated": true,
+  "note": "Same bedroom from the opposite corner looking east. Six-panel bypass closet doors fill the left third, the hall door stands open at centre-right showing the hallway beyond, blank wall right, shutter-slat sun stripes on the oak floor again. ~14.6 mm."
+ },
+ "bedroom_second_floor_1": {
+  "photo": "bedroom_second_floor_1.png",
+  "room": "bed-second",
+  "level": "second",
+  "pos": [
+   38.4,
+   13.55,
+   15.6
+  ],
+  "target": [
+   30.2,
+   13.55,
+   5.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5025,
+  "exposure": 1.15,
+  "pixels": [
+   1528,
+   1017
+  ],
+  "estimated": true,
+  "note": "Second-floor bedroom (12'5\" x 12'9\") looking NW. A three-lite casement window sits left of centre in the far wall with dense green foliage outside, a black caged-fan flush fixture hangs at centre-top, closet edge at the right, beige carpet, plain painted walls. Very low chroma (mean 8.4). ~14.6 mm."
+ },
+ "bedroom_second_floor_kid-1_1": {
+  "photo": "bedroom_second_floor_kid-1_1.png",
+  "room": "bed-second",
+  "level": "second",
+  "pos": [
+   1.4,
+   13.55,
+   32.4
+  ],
+  "target": [
+   9.2,
+   13.55,
+   43.6
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5079,
+  "exposure": 1.15,
+  "pixels": [
+   1529,
+   1014
+  ],
+  "estimated": true,
+  "note": "The 10'10\" x 13'2\" bedroom looking SE toward the front of the house. A three-lite casement in the right half looks out over the street and a neighbour's roof, the black caged-fan flush fixture is at top centre-left, and the rest is bare wall and beige carpet. The lowest-chroma frame in the set. ~14.6 mm."
+ },
+ "bedroom_second_floor_kid-2_1": {
+  "photo": "bedroom_second_floor_kid-2_1.png",
+  "room": "bed-second",
+  "level": "second",
+  "pos": [
+   18.4,
+   13.55,
+   32.4
+  ],
+  "target": [
+   27,
+   13.55,
+   43
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5054,
+  "exposure": 1.15,
+  "pixels": [
+   1531,
+   1017
+  ],
+  "estimated": true,
+  "note": "The 13'2\" x 13'2\" bedroom looking SE. A wood-stained double casement sits right of centre in the far wall with tree canopy outside, the black caged-fan fixture is at top centre, floor and wall vents visible, beige carpet. ~14.6 mm."
+ },
+ "dining_room": {
+  "photo": "dining_room.png",
+  "room": "dining",
+  "level": "first",
+  "pos": [
+   39.4,
+   4,
+   10.4
+  ],
+  "target": [
+   28.6,
+   4,
+   1.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5064,
+  "exposure": 1.15,
+  "pixels": [
+   1526,
+   1013
+  ],
+  "estimated": true,
+  "note": "Dining room from its SE corner looking NW. Canted bay of three casement windows fills the left wall with a big tree just outside, a shallow recessed niche on the far wall right of centre, brass-and-opal sputnik chandelier centre-top, crown moulding, red-oak floor. ~14.6 mm; the ceiling and the full window sill both fit."
+ },
+ "exterior_view_of_front_door": {
+  "photo": "exterior_view_of_front_door.png",
+  "room": "exterior-entry",
+  "level": "exterior",
+  "pos": [
+   37.9,
+   3.31,
+   58.0
+  ],
+  "target": [
+   31.472123903134605,
+   3.31,
+   50.33955556881022
+  ],
+  "fovV": 78.6,
+  "shift": 0,
+  "aspect": 1.501,
+  "exposure": 0.515,
+  "pixels": [
+   1531,
+   1020
+  ],
+  "estimated": false,
+  "note": "SOLVED, not estimated. Camera fitted by back-projection to the 3'0\" x 6'8\" door leaf and the two corners of the entry recess in exterior_view_of_front_door.png: f = 623 px on a 1531x1020 frame (fovV 78.6 deg, the same ~14.6 mm lens as the interiors), station 37.9 / 3.31 / 58.0 on the walk east of the door, yaw 40 deg west of north so the west wing fills the left third and the porthole clips the top-right corner. Camera height 3.31 world Y = 4.2 ft above the walk, which is what the door leaf's 312 px height and 126 px width jointly require.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "family_room_1": {
+  "photo": "family_room_1.png",
+  "room": "family",
+  "level": "first",
+  "pos": [
+   43.5,
+   4,
+   22
+  ],
+  "target": [
+   56,
+   4,
+   8.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5094,
+  "exposure": 1.15,
+  "pixels": [
+   1526,
+   1011
+  ],
+  "estimated": true,
+  "note": "The plan's LIVING ROOM (18'11\" x 18'2\"), shot diagonally into the NE corner. Ledgestone corner fireplace dead centre with a lit gas fire and a black cylindrical flue rising to the ceiling, a window either side of it, a tall window on the left wall, another on the right. This is the frame used for the two-vanishing-point focal-length calibration: f = 625 px, vFOV 78.6\u00b0."
+ },
+ "family_room_2": {
+  "photo": "family_room_2.png",
+  "room": "family",
+  "level": "first",
+  "pos": [
+   43,
+   4,
+   14.5
+  ],
+  "target": [
+   59.6,
+   4,
+   15.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5049,
+  "exposure": 1.15,
+  "pixels": [
+   1529,
+   1016
+  ],
+  "estimated": true,
+  "note": "Same room looking east. Ledgestone fireplace with its raised stone hearth and black flue at the left edge, a tall window beyond it, then the wet bar \u2014 black cabinets, wine fridge, vertical wood slat panel \u2014 at centre-right, and a long blank wall filling the right. ~14.6 mm."
+ },
+ "family_room_3": {
+  "photo": "family_room_3.png",
+  "room": "family",
+  "level": "first",
+  "pos": [
+   46,
+   4,
+   21.6
+  ],
+  "target": [
+   46.6,
+   4,
+   5
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5039,
+  "exposure": 1.15,
+  "pixels": [
+   1525,
+   1014
+  ],
+  "estimated": true,
+  "note": "Same room looking north. The cased opening back to the kitchen hall with its one-step change in floor level is at the far left, blank wall and a narrow window centre, and the ledgestone fireplace with its clerestory window and black flue occupies the right third. ~14.6 mm."
+ },
+ "foyer_view_of_front_door": {
+  "photo": "foyer_view_of_front_door.png",
+  "room": "foyer",
+  "level": "first",
+  "pos": [
+   31.5,
+   4,
+   30.2
+  ],
+  "target": [
+   32.6,
+   4,
+   42.6
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5339,
+  "exposure": 1.15,
+  "pixels": [
+   1514,
+   987
+  ],
+  "estimated": true,
+  "note": "Inside the foyer looking straight at the front door (+Z, street side). Black door with its round obscure-glass porthole dead centre-left, tall shuttered sidelight windows filling the left third and a second shuttered window right of the door, six-panel bypass closet doors on the right wall, red-oak floor. Very wide (~14.6 mm) \u2014 the whole door wall plus a closet wall in one frame. This PNG is 1514x987, the widest aspect of the interiors (1.534)."
+ },
+ "front_leftside_of_house": {
+  "photo": "front_leftside_of_house.png",
+  "room": "exterior-front",
+  "level": "exterior",
+  "pos": [
+   -16,
+   5.6,
+   84
+  ],
+  "target": [
+   20,
+   5.6,
+   44
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.5,
+  "exposure": 0.515,
+  "pixels": [
+   1527,
+   1018
+  ],
+  "estimated": true,
+  "note": "Three-quarter view from the front-left (west) corner of the lot. Pine boughs frame the top-left, the two-storey mass runs away to the right toward the garage and driveway. Wide-ish but not extreme (~19 mm); strong raking afternoon sun on the siding, deep shadows on the lawn.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "front_rightside_of_house": {
+  "photo": "front_rightside_of_house.png",
+  "room": "exterior-front",
+  "level": "exterior",
+  "pos": [
+   78,
+   5.6,
+   80
+  ],
+  "target": [
+   44,
+   5.6,
+   45
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.5119,
+  "exposure": 0.515,
+  "pixels": [
+   1527,
+   1010
+  ],
+  "estimated": true,
+  "note": "Three-quarter view from the front-right (east), standing on/near the driveway apron. Garage door dominates the right half, entry recess and porthole window centre-left, concrete drive sweeps in from the bottom-left. ~19 mm equiv.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "hallway_top_of_stairs_looking_down_at_front_door": {
+  "photo": "hallway_top_of_stairs_looking_down_at_front_door.png",
+  "room": "upper-hall",
+  "level": "second",
+  "pos": [
+   38.6,
+   13.55,
+   30
+  ],
+  "target": [
+   30.6,
+   13.55,
+   42
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5039,
+  "exposure": 1.15,
+  "pixels": [
+   1528,
+   1016
+  ],
+  "estimated": true,
+  "note": "From the top of the stair looking SW down into the two-storey entry. Sculptural skylight slots cut across the vaulted ceiling, the round porthole window and the brass dandelion chandelier are at the left, the black front door and its shuttered sidelights are below-left, and the oak-capped rail with black square balusters runs from centre to the right edge. ~14.6 mm; camera 4.05 ft above the second floor."
+ },
+ "kitchen_breakfast_nook": {
+  "photo": "kitchen_breakfast_nook.png",
+  "room": "breakfast-nook",
+  "level": "first",
+  "pos": [
+   13.6,
+   4,
+   2.4
+  ],
+  "target": [
+   26,
+   4,
+   15.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5099,
+  "exposure": 1.15,
+  "pixels": [
+   1528,
+   1012
+  ],
+  "estimated": true,
+  "note": "Breakfast nook looking SE toward the kitchen. Bypass closet doors on the left wall, a white boxed column just left of centre, a soffit crossing the ceiling, and the kitchen island and cabinets small in the middle distance. Red-oak floor with a bright sun patch. ~14.6 mm."
+ },
+ "kitchen_view_1": {
+  "photo": "kitchen_view_1.png",
+  "room": "kitchen",
+  "level": "first",
+  "pos": [
+   29.9,
+   4,
+   27.6
+  ],
+  "target": [
+   14.2,
+   4,
+   19.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.522,
+  "exposure": 1.15,
+  "pixels": [
+   1522,
+   1000
+  ],
+  "estimated": true,
+  "note": "Kitchen from its east end looking WNW down the L. Painted greige wall cabinets wrap the left and far walls, a plaster-look hood over the slide-in gas range left of centre, black gooseneck faucet and dishwasher on the far run, panelled counter-depth fridge and a tall pantry cabinet at the right edge, white-oak island with quartz top low-right, two brass-and-black pendants. Very wide (~14.6 mm): ceiling cans at the top edge and the island counter cropped at the bottom."
+ },
+ "kitchen_view_2": {
+  "photo": "kitchen_view_2.png",
+  "room": "kitchen",
+  "level": "first",
+  "pos": [
+   29.9,
+   4,
+   19.4
+  ],
+  "target": [
+   14.2,
+   4,
+   28.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5069,
+  "exposure": 1.15,
+  "pixels": [
+   1519,
+   1008
+  ],
+  "estimated": true,
+  "note": "Kitchen from the north-east corner looking WSW. The island is the foreground mass at centre-left, the run with sink and range is on the right, and a wide cased opening on the left leads through to a hall with a white six-panel door. Pendants hang at centre. Same ~14.6 mm as the rest of the interiors."
+ },
+ "kitchen_view_3": {
+  "photo": "kitchen_view_3.png",
+  "room": "kitchen",
+  "level": "first",
+  "pos": [
+   29.4,
+   4,
+   27.9
+  ],
+  "target": [
+   13.6,
+   4,
+   20.8
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5119,
+  "exposure": 1.15,
+  "pixels": [
+   1527,
+   1010
+  ],
+  "estimated": true,
+  "note": "A step left of kitchen_view_1 and slightly more frontal on the range wall. Full L of upper cabinets, hood centred, quartz slab backsplash, under-cabinet strips on, island and the panelled fridge / tall pantry stack at the right. ~14.6 mm."
+ },
+ "kitchen_view_5": {
+  "photo": "kitchen_view_5.png",
+  "room": "kitchen",
+  "level": "first",
+  "pos": [
+   15.5,
+   4,
+   27.6
+  ],
+  "target": [
+   24.5,
+   4,
+   7
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5054,
+  "exposure": 1.15,
+  "pixels": [
+   1525,
+   1013
+  ],
+  "estimated": true,
+  "note": "From the kitchen sink corner looking NE across the island toward the glazed rear wall. Sink and dishwasher cropped in the near left foreground, panelled fridge behind, island with its built-in microwave drawer centre, and the far wall of sliding glass with the deck and back lawn burning through at the right. The window plate stays fully legible \u2014 this is the shot that proves the HDR merge."
+ },
+ "master_bedroom_1": {
+  "photo": "master_bedroom_1.png",
+  "room": "primary-bed",
+  "level": "second",
+  "pos": [
+   11.4,
+   13.55,
+   26.4
+  ],
+  "target": [
+   4.2,
+   13.55,
+   6.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5049,
+  "exposure": 1.15,
+  "pixels": [
+   1532,
+   1018
+  ],
+  "estimated": true,
+  "note": "Primary bedroom (11'7\" x 21'7\") from the south end looking north. The full-height vertical wood slat feature wall runs away down the entire left side, two white doors stand at the far end, a window shows at the right edge, beige carpet, one small sun patch. Second calibration frame: f = 631 px. ~14.6 mm."
+ },
+ "master_bedroom_2": {
+  "photo": "master_bedroom_2.png",
+  "room": "primary-bed",
+  "level": "second",
+  "pos": [
+   8.2,
+   13.55,
+   25.6
+  ],
+  "target": [
+   7.2,
+   13.55,
+   3.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5069,
+  "exposure": 1.15,
+  "pixels": [
+   1534,
+   1018
+  ],
+  "estimated": true,
+  "note": "Primary bedroom looking north from a step east of view 1. A small double-casement window on the left wall frames a neighbour's roof and brick, the sliding glass door to the wrap-around sunroom is at centre-right with the deck decking visible through it, and a tall wood wardrobe/built-in fills the right edge. Two rectangular sun patches on the carpet. ~14.6 mm."
+ },
+ "master_bedroom_3": {
+  "photo": "master_bedroom_3.png",
+  "room": "primary-bed",
+  "level": "second",
+  "pos": [
+   24,
+   13.55,
+   26.6
+  ],
+  "target": [
+   15.4,
+   13.55,
+   21
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5109,
+  "exposure": 1.15,
+  "pixels": [
+   1529,
+   1012
+  ],
+  "estimated": true,
+  "note": "The carpeted vestibule/closet end looking into the primary bath. Plain white walls on three sides, a deep light-well with a round flush fixture in the soffit above, and a tall cased opening at centre-right through which the bath's wood vanity and slat wall are visible against dark tile. ~14.6 mm."
+ },
+ "master_bedroom_bathroom_view_1": {
+  "photo": "master_bedroom_bathroom_view_1.png",
+  "room": "primary-bath",
+  "level": "second",
+  "pos": [
+   25,
+   13.55,
+   18
+  ],
+  "target": [
+   14.6,
+   13.55,
+   9
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5118,
+  "exposure": 1.15,
+  "pixels": [
+   1533,
+   1014
+  ],
+  "estimated": true,
+  "note": "Primary bath looking NW. A sliding glass door to the sunroom fills the left third with trees and lawn fully legible through it, the brown-tile shower with frameless glass and the drop-in tub occupy the centre, the WC door is open on the right, and a gabled skylight well opens the ceiling above. ~14.6 mm."
+ },
+ "master_bedroom_bathroom_view_2": {
+  "photo": "master_bedroom_bathroom_view_2.png",
+  "room": "primary-bath",
+  "level": "second",
+  "pos": [
+   22.5,
+   13.55,
+   18.6
+  ],
+  "target": [
+   19.2,
+   13.55,
+   6.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.498,
+  "exposure": 1.15,
+  "pixels": [
+   1519,
+   1014
+  ],
+  "estimated": true,
+  "note": "Primary bath looking north along the vanity wall. A white door on the far left opens onto the carpeted bedroom, a white boxed column stands left of centre, the long wood double vanity with black stone top, backlit slat wall and swing-arm magnifying mirror runs across the centre, and the sunroom slider is at the right with a second skylight well overhead. ~14.6 mm."
+ },
+ "master_bedroom_wrap-around_indoor_patio_from_bedroom_to_bathroom": {
+  "photo": "master_bedroom_wrap-around_indoor_patio_from_bedroom_to_bathroom.png",
+  "room": "sunroom",
+  "level": "second",
+  "pos": [
+   25,
+   13.55,
+   3.2
+  ],
+  "target": [
+   1.2,
+   13.55,
+   3
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5074,
+  "exposure": 1.15,
+  "pixels": [
+   1533,
+   1017
+  ],
+  "estimated": true,
+  "note": "The glazed wrap-around sunroom (24'9\" x 4'11\") looking west down its length. Dark-framed floor-to-ceiling glazing runs the full right side onto the back yard, the ribbed dark decking floor recedes to a vanishing point, a small window and a slider are at the far end, and another slider is cropped at the left edge. Extremely wide feel (~14.6 mm) because the corridor is under 5 ft deep."
+ },
+ "mudroom_1": {
+  "photo": "mudroom_1.png",
+  "room": "mudroom",
+  "level": "first",
+  "pos": [
+   11.6,
+   4,
+   27.8
+  ],
+  "target": [
+   2.2,
+   4,
+   21.4
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5059,
+  "exposure": 1.15,
+  "pixels": [
+   1530,
+   1016
+  ],
+  "estimated": true,
+  "note": "The plan's LAUNDRY, from the SE corner looking NW. A cased opening on the left shows red-oak floor beyond, teal-blue shaker wall cabinets over the white LG washer and dryer fill the centre, and a white exterior door with an obscure-glass light is on the right. Light vinyl plank floor, opal flush mount above. Cool white balance \u2014 the only cool frame in the set. ~14.6 mm."
+ },
+ "straight_on_view_of_house_from_street": {
+  "photo": "straight_on_view_of_house_from_street.png",
+  "room": "exterior-front",
+  "level": "exterior",
+  "pos": [
+   27,
+   5.6,
+   95
+  ],
+  "target": [
+   27,
+   5.6,
+   45
+  ],
+  "fovV": 64,
+  "shift": 0,
+  "aspect": 1.4936,
+  "exposure": 0.515,
+  "pixels": [
+   1525,
+   1021
+  ],
+  "estimated": false,
+  "note": "SOLVED, not estimated. Facade scale 16.4 px/ft (8\" siding courses = 11 px, 4 ft porthole = 65 px) with f = 818 px puts the camera 49.9 ft off the front wall -> z = 95. The horizon sits 109 px above the garage slab line -> eye 5.6 ft above grade (hand-held, not the interior tripod). Camera x centres the entry box at photo x 853.",
+  "post": {
+   "saturation": 1.38,
+   "rolloff": 0.1,
+   "rolloffKnee": 0.94,
+   "highlightDesat": 0.16,
+   "lift": 0.022,
+   "vignette": 0.02,
+   "grain": 0.0008,
+   "sharpen": 0.55,
+   "sharpenRadius": 0.9
+  }
+ },
+ "view_from_breakfast_nook_looking_out_at_backyard_patio": {
+  "photo": "view_from_breakfast_nook_looking_out_at_backyard_patio.png",
+  "room": "breakfast-nook",
+  "level": "first",
+  "pos": [
+   25.5,
+   4,
+   14.6
+  ],
+  "target": [
+   8,
+   4,
+   2.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5039,
+  "exposure": 1.15,
+  "pixels": [
+   1525,
+   1014
+  ],
+  "estimated": true,
+  "note": "From the nook looking WNW into the family-room end. The rear glazed wall runs across the left half with the lawn and deck legible through it, a white boxed column stands at centre, a white six-panel door and blank wall to the right. Ceiling cans in two rows. ~14.6 mm."
+ },
+ "view_from_kitchen_of_living_room_looking_out_to_backyard": {
+  "photo": "view_from_kitchen_of_living_room_looking_out_to_backyard.png",
+  "room": "living",
+  "level": "first",
+  "pos": [
+   13.4,
+   4,
+   17
+  ],
+  "target": [
+   4,
+   4,
+   1.2
+  ],
+  "fovV": 78.5,
+  "shift": 0,
+  "aspect": 1.5099,
+  "exposure": 1.15,
+  "pixels": [
+   1525,
+   1010
+  ],
+  "estimated": true,
+  "note": "The plan's FAMILY ROOM (12'1\" x 19'8\"), photographed from the kitchen side looking NW at the rear window wall. White boxed support column just left of centre, sliding glass and a French door with its own sidelight to the right, a small awning window on the left wall, red-oak floor, one step down at the near edge. ~14.6 mm."
+ }
 }

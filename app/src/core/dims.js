@@ -1033,19 +1033,30 @@ export const OPENINGS = [
     note: 'two-car overhead door, flush panel, dark bronze',
   },
 
+  // CORRECTED (exterior-entry, round 1) — measured off
+  // `exterior_view_of_front_door.png` by back-projecting the observed jamb
+  // edges onto z = 42.309 with a camera fitted to the door leaf (3'0" x 6'8")
+  // and the two recess corners.  The three units are NOT symmetric about the
+  // door and they are NOT sill-height windows: both flanking lights run
+  // essentially floor to head (glass bottom measured at y = +0.2, i.e. 0.65 ft
+  // above the bluestone), which is what `foyer_view_of_front_door.png` shows
+  // from inside — full-height plantation shutters on both sides.
+  //   east light  x 35.1 .. 39.3  (4.2 ft, two shutter panels)
+  //   door leaf   x 31.8 .. 34.8  (3.0 ft, centre 33.30)
+  //   west light  x 28.3 .. 31.6  (3.3 ft, two shutter panels)
   {
     wall: 'ext-first-6',
     type: 'window',
-    center: 2.6,
-    w: 3.6,
-    h: 6.0,
-    sill: 1.0,
-    note: 'entry window, white plantation shutters',
+    center: 2.45,
+    w: 4.2,
+    h: 6.4,
+    sill: 0.15,
+    note: 'entry window east of the door, white plantation shutters',
   },
   {
     wall: 'ext-first-6',
     type: 'door',
-    center: 6.2,
+    center: 6.37,
     w: 3.0,
     h: ft(6, 10),
     sill: 0,
@@ -1058,11 +1069,11 @@ export const OPENINGS = [
   {
     wall: 'ext-first-6',
     type: 'window',
-    center: 9.4,
-    w: 3.0,
-    h: 6.0,
-    sill: 1.0,
-    note: 'front-door sidelight, white plantation shutters',
+    center: 9.72,
+    w: 3.3,
+    h: 6.4,
+    sill: 0.15,
+    note: 'front-door sidelight west of the door, white plantation shutters',
   },
 
   { wall: 'ext-first-8', type: 'window', center: 4.6, w: 3.2, h: 5.0, sill: 2.0, note: 'first-floor bath, obscure' },
@@ -1110,9 +1121,15 @@ export const OPENINGS = [
     wall: 'ext-second-4',
     type: 'window',
     center: 4.6,
-    w: 4.0,
-    h: 4.0,
-    sill: 3.1,
+    w: 4.3,
+    h: 4.3,
+    // CORRECTED (exterior-entry, round 1): the porthole sits LOW in the entry
+    // box, not high. In `exterior_view_of_front_door.png` its centre projects
+    // 8.2 ft above the camera at the door's own depth; with the camera height
+    // fixed by the 6'8" door leaf that puts the centre at y = 12.7, i.e. only
+    // 3.2 ft above the second-floor deck. The old sill of 3.1 put it 2 ft too
+    // high and pushed it out of that frame entirely.
+    sill: 1.05,
     shape: 'round',
     note: 'ROUND PORTHOLE WINDOW over the entry — reads into the two-storey foyer',
   },
@@ -1457,9 +1474,9 @@ export const MASSING = {
       cantilever: true,
       porthole: {
         shape: 'round',
-        center: [F.xGarWo - 4.05, CEIL_Y.second - 2.9, F.zFront0],
-        width: 4.0, // ~48" outside the trim ring; ~42" of glass
-        height: 4.0, // MEASURED circular in straight_on_view_of_house_from_street.png
+        center: [F.xGarWo - 4.05, LEVELS.second + 3.2, F.zFront0],
+        width: 4.3, // ~52" outside the trim ring; ~44" of glass
+        height: 4.3, // MEASURED circular in straight_on_view_of_house_from_street.png
         frame: 'charcoal',
         frameW: inch(4.2),
         note:
@@ -1478,19 +1495,26 @@ export const MASSING = {
         [F.xGarWo, F.zFront0 + 0.6],
         [F.xFoyW, F.zFront0 + 0.6],
       ],
-      baseY: -0.42, // bluestone paving, one riser below the threshold
+      baseY: -0.45, // bluestone paving, one riser below the threshold
       topY: CEIL_Y.first, // underside of the cantilevered entry box
-      floorY: -0.42,
+      floorY: -0.45,
       soffitY: CEIL_Y.first,
       storeys: 0,
+      // MEASURED (exterior-entry): the reeded post stands just PROUD of the
+      // facade, out on the bluestone, carrying the front edge of the beam.
+      // Its base back-projects to x 27.9-28.1, z 45.4-46.0.
       post: {
-        at: [F.xFoyW + 0.9, F.zFront0 + 0.1],
-        w: 0.75,
-        d: 0.75,
+        at: [F.xFoyW + 0.8, F.zFront0 + 0.35],
+        w: inch(9),
+        d: inch(9),
         topY: CEIL_Y.first,
         material: 'stainDark',
       },
-      beamDepth: 0.9,
+      // The beam soffit reads at y = 7.25 in exterior_view_of_front_door.png,
+      // i.e. 1.25 ft below the first-floor ceiling plane.
+      beamDepth: 1.25,
+      /** Bluestone stoop: it runs 5 ft PAST the facade, well beyond the soffit. */
+      stoop: [F.xFoyW - 0.55, F.zRec0, F.xGarWo + 0.65, F.zFront0 + 5.0],
     },
   },
 
@@ -1557,11 +1581,12 @@ export const MASSING = {
         [F.xGarWo, F.zFront0],
         [F.xFoyW, F.zFront0],
       ],
-      eaveY: 19.9,
-      ridgeY: 20.2,
+      eaveY: 19.5,
+      ridgeY: 19.8,
       pitch: 0.4,
-      overhang: 2.4,
-      fasciaH: 2.2,
+      overhang: 1.5,
+      fasciaH: 1.35,
+      fasciaTone: 'trim',
       material: 'membraneCharcoal',
       note: 'Deep fascia box reading as a flat cap over the porthole.',
     },
@@ -1756,18 +1781,23 @@ export const SITE = {
     poly: [
       [-26.0, -96.0],
       [88.0, -96.0],
-      [88.0, 84.0],
-      [-26.0, 84.0],
+      [88.0, 112.0],
+      [-26.0, 112.0],
     ],
     grassY: -1.15,
     frontSetback: 45.143,
   },
 
+  // The straight-on photograph is taken from the FRONT LAWN, not the street:
+  // the whole bottom edge of the 1021-px frame is turf, and with f = 818 px
+  // and a 5.6 ft eye the nearest visible ground is 10.9 ft from the lens.
+  // Since the facade scale fixes the camera 49.9 ft off the front wall
+  // (z = 95), the walk cannot be closer to the house than ~53 ft.
   street: {
-    curbZ: 84.0,
+    curbZ: 107.0,
     curbH: 0.5,
-    sidewalk: { z0: 74.0, z1: 79.0, y: -0.85, material: 'concreteBroom' },
-    pavement: { z0: 84.5, z1: 110.0, y: -1.6, material: 'asphaltWorn' },
+    sidewalk: { z0: 98.0, z1: 103.0, y: -1.35, material: 'concreteBroom' },
+    pavement: { z0: 107.5, z1: 134.0, y: -2.1, material: 'asphaltWorn' },
   },
 
   driveway: {
@@ -1776,12 +1806,12 @@ export const SITE = {
     poly: [
       [39.2, 45.4],
       [61.2, 45.4],
-      [66.0, 56.0],
-      [72.0, 74.0],
-      [74.0, 84.5],
-      [46.0, 84.5],
-      [44.0, 68.0],
-      [41.0, 56.0],
+      [66.0, 58.0],
+      [72.0, 80.0],
+      [76.0, 107.5],
+      [50.0, 107.5],
+      [47.0, 82.0],
+      [41.5, 58.0],
     ],
     jointSpacing: 10.0,
   },
@@ -1796,19 +1826,24 @@ export const SITE = {
       [36.5, 49.5],
       [33.4, 46.2],
     ],
-    landing: [F.xFoyW - 0.4, F.zFront0 - 0.2, F.xGarWo + 0.4, F.zFront0 + 4.4],
+    // The RAISED bluestone stoop (MASSING.blocks.entryPorch.stoop) runs from
+    // the recess wall out to z = 50.14 — measured off exterior_view_of_front_door
+    // by back-projecting the step nosing, which lands 5 ft PAST the facade.
+    // `landing` is therefore the flat apron at WALK level directly in front of
+    // that nosing, not the porch itself.
+    landing: [F.xFoyW + 1.0, F.zFront0 + 5.0, F.xGarWo + 3.3, F.zFront0 + 9.4],
   },
 
   hedges: [
     {
       id: 'hedge-entry-east',
       poly: [
-        [41.6, 46.6],
-        [50.4, 46.6],
-        [50.4, 57.4],
-        [41.6, 57.4],
+        [41.4, 46.6],
+        [51.0, 46.6],
+        [51.0, 55.6],
+        [41.4, 55.6],
       ],
-      h: 6.6,
+      h: 8.2,
       form: 'roundedBlob',
       species: 'privet',
       note: 'The tall rounded mass between the walk and the driveway.',
@@ -1908,16 +1943,29 @@ export const SITE = {
   trees: [
     {
       id: 'front-redbud',
-      at: [11.0, 63.0],
-      trunkR: 0.62,
-      canopyR: 13.5,
-      crownBaseY: 6.0,
-      crownTopY: 22.0,
+      // SOLVED off straight_on_view_of_house_from_street.png, not guessed.
+      // The trunk base sits 280 px below the horizon and the mulch ring's far
+      // edge 200 px below it; with f = 818 px and a 5.6 ft eye that fixes the
+      // trunk at ~21 ft from the camera (z = 74) and the ring at 13 x 8 ft.
+      // The canopy is therefore only ~19 ft across — it dominates the frame
+      // because it is CLOSE, not because it is huge.
+      at: [19.6, 73.0],
+      trunkR: 0.58,
+      canopyR: 8.2,
+      crownBaseY: 5.0,
+      crownTopY: 15.0,
       species: 'redbud',
       note: 'The broad multi-stem canopy that dominates straight_on_view_of_house.',
     },
-    { id: 'front-pine', at: [-16.0, 46.0], trunkR: 0.95, canopyR: 12.0, crownBaseY: 8.0, crownTopY: 44.0, species: 'pine' },
-    { id: 'front-maple-e', at: [66.0, 68.0], trunkR: 0.55, canopyR: 9.0, crownBaseY: 7.0, crownTopY: 24.0, species: 'maple' },
+    { id: 'front-pine', at: [-13.0, 52.0], trunkR: 0.95, canopyR: 13.0, crownBaseY: 9.0, crownTopY: 46.0, species: 'pine' },
+    { id: 'front-maple-e', at: [70.0, 62.0], trunkR: 0.5, canopyR: 7.5, crownBaseY: 6.0, crownTopY: 20.0, species: 'maple' },
+    /* --- the canopy that closes the sky BEHIND the roof ---------------- */
+    { id: 'bg-poplar-c', at: [28.0, -10.0], trunkR: 0.9, canopyR: 19.0, crownBaseY: 10.0, crownTopY: 50.0, species: 'poplar' },
+    { id: 'bg-poplar-e', at: [62.0, -18.0], trunkR: 0.9, canopyR: 21.0, crownBaseY: 10.0, crownTopY: 54.0, species: 'poplar' },
+    { id: 'bg-maple-w', at: [-2.0, -20.0], trunkR: 0.85, canopyR: 19.0, crownBaseY: 9.0, crownTopY: 46.0, species: 'maple' },
+    { id: 'bg-maple-ne', at: [96.0, 2.0], trunkR: 0.8, canopyR: 20.0, crownBaseY: 9.0, crownTopY: 44.0, species: 'maple' },
+    { id: 'bg-maple-far-e', at: [112.0, 40.0], trunkR: 0.7, canopyR: 17.0, crownBaseY: 8.0, crownTopY: 40.0, species: 'maple' },
+    { id: 'bg-maple-far-w', at: [-34.0, -6.0], trunkR: 0.8, canopyR: 18.0, crownBaseY: 9.0, crownTopY: 44.0, species: 'maple' },
     { id: 'rear-maple-w', at: [-8.0, -34.0], trunkR: 0.85, canopyR: 17.0, crownBaseY: 9.0, crownTopY: 44.0, species: 'maple' },
     { id: 'rear-maple-c', at: [20.0, -46.0], trunkR: 0.75, canopyR: 16.0, crownBaseY: 10.0, crownTopY: 42.0, species: 'maple' },
     { id: 'rear-maple-e', at: [48.0, -30.0], trunkR: 0.8, canopyR: 16.0, crownBaseY: 9.0, crownTopY: 40.0, species: 'maple' },
@@ -1927,28 +1975,38 @@ export const SITE = {
 
   neighbours: [
     {
+      // Cream stucco with a gable end and a stucco chimney on its west face,
+      // just clearing our garage corner in straight_on_view_of_house.
       id: 'nbr-east',
       poly: [
-        [76.0, 8.0],
-        [110.0, 8.0],
-        [110.0, 48.0],
-        [76.0, 48.0],
+        [69.0, -6.0],
+        [101.0, -6.0],
+        [101.0, 28.0],
+        [69.0, 28.0],
       ],
-      eaveY: 10.0,
-      ridgeY: 20.0,
-      color: '#c9bda8',
+      eaveY: 9.0,
+      ridgeY: 19.5,
+      ridgeDir: 'ns',
+      color: '#cdc0ab',
+      roofColor: '#585c5e',
+      chimney: { at: [69.4, 25.0], w: 3.2, d: 3.6, topY: 21.5 },
     },
     {
+      // Beige lap siding over a red brick base, gable roof, seen through the
+      // pine at the far left edge.
       id: 'nbr-west',
       poly: [
-        [-58.0, 12.0],
-        [-30.0, 12.0],
-        [-30.0, 46.0],
-        [-58.0, 46.0],
+        [-46.0, 4.0],
+        [-18.0, 4.0],
+        [-18.0, 40.0],
+        [-46.0, 40.0],
       ],
-      eaveY: 10.0,
-      ridgeY: 20.0,
-      color: '#b6a893',
+      eaveY: 9.5,
+      ridgeY: 19.0,
+      ridgeDir: 'ns',
+      color: '#bfae97',
+      brickBase: 3.6,
+      roofColor: '#5b5145',
     },
     {
       id: 'nbr-rear',

@@ -1186,8 +1186,14 @@ function buildDefaultLights(ctx, level, handle) {
  * window.  Without this the two-storey glass wall of the family room looks out
  * on nothing at all.
  */
-function buildBackdrop(ctx, handle) {
+function buildBackdrop(ctx, handle, opts = {}) {
   const { THREE } = ctx;
+  // `proxies` are the cheap stand-ins (blob trees, box neighbours, sphere
+  // shrubs) that only ever have to survive being seen through a window from
+  // inside. On the EXTERIOR scene they are the subject, not the backdrop, so
+  // the exterior pieces build the real thing and this switch turns the
+  // proxies off — otherwise both sets occupy the same ground.
+  const proxies = opts.proxies !== false;
   const g = new THREE.Group();
   g.name = 'shell:backdrop';
 
@@ -1202,7 +1208,7 @@ function buildBackdrop(ctx, handle) {
   const trunkM = M(ctx, 'mulchBed', 'blackMatte');
   const leafM = new THREE.MeshStandardMaterial({ color: 0x546b38, roughness: 0.95 });
   leafM.userData.keep = true;
-  for (const t of SITE.trees) {
+  for (const t of (proxies ? SITE.trees : [])) {
     const h = t.crownTopY - t.crownBaseY;
     const trunk = mesh(THREE, new THREE.CylinderGeometry(t.trunkR * 0.8, t.trunkR, t.crownBaseY + 2, 8),
       trunkM, `shell:tree:${t.id}:trunk`);
@@ -1225,7 +1231,7 @@ function buildBackdrop(ctx, handle) {
   nbrM.userData.keep = true;
   const roofM = new THREE.MeshStandardMaterial({ color: 0x6a5a4a, roughness: 0.92 });
   roofM.userData.keep = true;
-  for (const n of SITE.neighbours) {
+  for (const n of (proxies ? SITE.neighbours : [])) {
     const [x0, z0, x1, z1] = polyBBox(n.poly);
     const body = mesh(THREE, new THREE.BoxGeometry(x1 - x0, n.eaveY - SITE.lot.grassY, z1 - z0),
       nbrM, `shell:nbr:${n.id}`);
@@ -1239,13 +1245,13 @@ function buildBackdrop(ctx, handle) {
   }
   const shrubM = new THREE.MeshStandardMaterial({ color: 0x4d6135, roughness: 0.95 });
   shrubM.userData.keep = true;
-  for (const s of SITE.shrubs) {
+  for (const s of (proxies ? SITE.shrubs : [])) {
     const b = mesh(THREE, new THREE.SphereGeometry(s.r, 10, 7), shrubM, 'shell:shrub');
     b.scale.y = 0.85;
     b.position.set(s.at[0], SITE.lot.grassY + s.r * 0.7, s.at[1]);
     g.add(b);
   }
-  for (const hg of SITE.hedges) {
+  for (const hg of (proxies ? SITE.hedges : [])) {
     const [x0, z0, x1, z1] = polyBBox(hg.poly);
     const b = mesh(THREE, new THREE.BoxGeometry(x1 - x0, hg.h, z1 - z0), shrubM, `shell:${hg.id}`);
     b.position.set((x0 + x1) / 2, SITE.lot.grassY + hg.h / 2, (z0 + z1) / 2);
@@ -1481,14 +1487,12 @@ function buildExterior(ctx, handle) {
   post.position.set(porch.post.at[0], (porch.floorY + porch.post.topY) / 2, porch.post.at[1]);
   ctx.group.add(post);
 
-  buildBackdrop(ctx, handle);
-
-  const shrubM = new THREE.MeshStandardMaterial({ color: 0x4d6135, roughness: 0.95 });
-  shrubM.userData.keep = true;
-  for (const h of SITE.hedges) {
-    const b = extrudePoly(THREE, h.poly, SITE.lot.grassY, SITE.lot.grassY + h.h, shrubM, `site:${h.id}`);
-    ctx.group.add(b);
-  }
+  // Real planting is owned by the exterior room modules (rooms/exterior-front
+  // builds it for the whole site and memoises it on the scene), so the shell
+  // only lays the far-field ground here.
+  // (buildBackdrop's proxy trees / box neighbours / sphere shrubs are for
+  // INTERIOR windows only — on the exterior scene they would sit inside the
+  // real planting.)
 }
 
 /* ======================================================================== */

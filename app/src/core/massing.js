@@ -48,8 +48,16 @@ const EPS = 1e-6;
 /* ======================================================================== */
 
 export const PALETTE = {
-  /** Weathered silver-greige cedar. Front photos read warmer than the rear. */
-  siding: 0xada79c,
+  /**
+   * Weathered silver-greige cedar.
+   *
+   * NOTE this is a TINT ON TOP OF `grayLapSiding`, whose own tone already sits
+   * at ~155/255. Multiplying that by a mid-grey put the effective albedo at
+   * 0.14 and rendered a facade barely half as bright as the photograph's
+   * MEASURED 138/132/113 sunlit siding. The tint therefore has to be light and
+   * warm; the texture supplies the value, this supplies the hue.
+   */
+  siding: 0xd9cdba,
   /** Fascia / soffit / corner boards / window frames — the dark second tone. */
   trim: 0x4b4d48,
   /** Slightly warmer dark for stained timber (porch post, sunroom frame). */
@@ -110,7 +118,7 @@ function makeLocals(ctx) {
     }),
     /** Same boards, the rear elevation's greener cast. */
     sidingRear: () => derive('sidingRear', lib.grayLapSiding, {
-      color: 0x9ea296, normalScale: 0.55, roughness: 0.88,
+      color: 0xdfe0d4, normalScale: 0.55, roughness: 0.88,
       envMapIntensity: 0.9, aoMapIntensity: 0.5,
     }),
     /** Rough-sawn dark trim: fascia, soffit, corner boards, casings. */
@@ -138,20 +146,29 @@ function makeLocals(ctx) {
       clearcoat: 0.5, clearcoatRoughness: 0.2, envMapIntensity: 0.8,
     }),
     /** Exterior glazing: reflective, faintly transmissive, sky in every pane. */
+    // MEASURED against exterior_view_of_front_door.png and foyer_view: the
+    // glazing in these photographs is NOT a mirror. Through the entry lights
+    // you read the plantation-shutter louvers, the tilt rods and the greenery
+    // behind them; only the top corner of each pane carries a sky reflection.
+    // envMapIntensity 1.55 turned every light into a sheet of blank blue sky
+    // and cost the entry its single most recognisable feature.
     glass: () => derive('extGlass', null, {
-      color: 0xcdd6d8, roughness: 0.035, metalness: 0.0,
-      transmission: 0.62, thickness: 0.06, ior: 1.52,
+      color: 0xd5dcdd, roughness: 0.045, metalness: 0.0,
+      transmission: 0.80, thickness: 0.05, ior: 1.52,
       transparent: true, opacity: 1.0,
-      specularIntensity: 1.0, envMapIntensity: 1.55,
-      clearcoat: 1.0, clearcoatRoughness: 0.02,
+      specularIntensity: 0.9, envMapIntensity: 0.62,
+      clearcoat: 0.85, clearcoatRoughness: 0.03,
       side: THREE.DoubleSide,
     }),
     /** Interior surface seen faintly through the glass. */
     interior: () => derive('interiorCard', null, {
       color: 0xd9cfbe, roughness: 0.92, metalness: 0,
     }),
+    // Never meant to be seen from outside — kept dark so that if a board run
+    // ever falls short of a wall panel the gap reads as a shadow, not as a
+    // white stripe across the elevation.
     sheathing: () => derive('sheathing', null, {
-      color: 0xe6e1d6, roughness: 0.94, metalness: 0,
+      color: 0x6d675d, roughness: 0.94, metalness: 0,
     }),
     concrete: () => (lib.concreteDriveway || derive('concreteFallback', null, { color: 0xa8a49c })),
     bluestone: () => (lib.bluestone || derive('bluestoneFallback', null, { color: 0x7c8189 })),
@@ -483,7 +500,12 @@ function eaveTrim(ctx, locals, box, r, group, opts = {}) {
   const { ax0, az0, ax1, az1 } = box;
   const fh = r.fasciaH || 1.2;
   const eave = r.eaveY;
-  const trim = locals.trim();
+  // MEASURED, and it contradicts the "everything dark" reading in DETAILS.md:
+  // in straight_on_view_of_house_from_street the fascia and soffit of the
+  // GARAGE and MAIN hip roofs are the same warm greige as the siding, while
+  // the flat cap over the porthole box is charcoal. Window frames, corner
+  // boards and the garage-door jambs are charcoal everywhere.
+  const trim = r.fasciaTone === 'trim' ? locals.trim() : locals.siding();
   const t = inch(1.6);
   const soffitY = eave - fh;
 
@@ -526,6 +548,10 @@ const REAR_GLASS = /rear glass wall|sunroom glass wall|breakfast nook rear/i;
 function windowTypeFor(o) {
   const note = (o.note || '').toLowerCase();
   if (REAR_GLASS.test(note)) return 'fixed';
+  // The two entry lights are FIXED units, each with a single divided pane and
+  // a pair of plantation-shutter panels behind — no casement sash bars, which
+  // is exactly how they read in exterior_view_of_front_door.png.
+  if (/entry window|sidelight/.test(note)) return 'fixed';
   if (o.w >= 7) return 'threePanelCasement';
   if (o.w >= 4.2) return 'threePanelCasement';
   if (o.h <= 2.0) return 'fixed';
@@ -558,7 +584,15 @@ function buildOpening(ctx, locals, w, o, place, group) {
   if (o.type === 'window') {
     unit = kit.window(
       { w: o.w, h: o.h, type: windowTypeFor(o) },
-      { wall: w.t, casing: false, frame: dark, glass, shutters: shutters ? { tilt: deg(20) } : false }
+      {
+        wall: w.t, casing: false, frame: dark, glass,
+        // Two panels with a divider rail, louvers nearly flat and open — the
+        // entry shutters in the photograph are open enough to see the street
+        // through, not closed like the foyer's.
+        shutters: shutters
+          ? { tilt: deg(8), panels: Math.max(1, Math.round(o.w / 2.0)), divider: 0.55, rod: true }
+          : false,
+      }
     );
     // exterior casing: this house trims every window in the dark tone
     const cw = inch(3.6);
@@ -699,21 +733,29 @@ function buildWallsAndSiding(ctx, locals, G) {
       core.receiveShadow = true;
       g.add(core);
     }
-    // below-grade skirt so no daylight slips under the bottom course
-    const skirt = kit.box(len, 2.4, w.t, sheath, { r: inch(0.02) });
-    skirt.position.set(len / 2, -1.2, w.t / 2);
-    g.add(skirt);
+    // Below-grade skirt so no daylight slips under the bottom course. ONLY on
+    // a wall that actually reaches the ground: adding it to an upper-storey
+    // wall hangs a full-height slab of sheathing and siding down over the
+    // storey below, which is exactly what used to bury the whole entry — door,
+    // sidelights and all — behind a blank sheet of clapboard.
+    const onGrade = baseY <= 0.01;
+    if (onGrade) {
+      const skirt = kit.box(len, 2.4, w.t, sheath, { r: inch(0.02) });
+      skirt.position.set(len / 2, -1.2, w.t / 2);
+      g.add(skirt);
+    }
 
     // ---- the boards -----------------------------------------------------
     const isRear = w.a[1] < 12 && w.b[1] < 12;
     const sidingM = isRear ? rear : front;
     // the courses run level round the whole house, so they key off the LEVEL,
     // not off this wall's base.
-    const geo = lapSidingGeometry(THREE, rects.concat([[0, -1.35 - baseY, len, 0]]), {
-      exposure,
-      base: -1.35 - baseY,
-      seed: 11 + wi * 3,
-    });
+    const geo = lapSidingGeometry(THREE,
+      onGrade ? rects.concat([[0, -1.35 - baseY, len, 0]]) : rects, {
+        exposure,
+        base: -1.35 - baseY,
+        seed: 11 + wi * 3,
+      });
     const boards = meshOf(THREE, geo, sidingM, `massing:siding:${w.id}`);
     g.add(boards);
 
@@ -833,16 +875,9 @@ function buildEntry(ctx, locals, G) {
   const trim = locals.trim();
   const timber = locals.timber();
 
-  // ---- bluestone porch, one riser above the walk -------------------------
-  const stone = locals.bluestone();
-  const slab = kit.box(px1 - px0 + 0.9, 0.42, pz1 - pz0 + 0.7, stone, { r: inch(0.5), seg: 2, uv: true });
-  slab.position.set((px0 + px1) / 2, P.floorY - 0.21, (pz0 + pz1) / 2 + 0.2);
-  slab.castShadow = false;
-  applyUV(slab, 4, { axes: 'xz', size: [px1 - px0 + 0.9, pz1 - pz0 + 0.7] });
-  g.add(slab);
-  const riser = kit.box(px1 - px0 + 0.9, 0.5, 1.1, locals.concrete(), { r: inch(0.2), seg: 2 });
-  riser.position.set((px0 + px1) / 2, P.floorY - 0.62, pz1 + 0.75);
-  g.add(riser);
+  // The bluestone stoop, its riser and the walk are NOT built here: they run
+  // 5 ft past the facade and are laid slab by slab by rooms/exterior-entry.js,
+  // which owns this piece. All that is left here is the structure overhead.
 
   // ---- the deep dark soffit under the oversailing second floor -----------
   const soffit = kit.box(px1 - px0, inch(3), pz1 - pz0 + 0.9, trim, { r: inch(0.06), uv: true });
@@ -858,7 +893,7 @@ function buildEntry(ctx, locals, G) {
   const post = new THREE.Group();
   const pTop = CEIL_Y.first - P.beamDepth;
   const pH = pTop - P.floorY;
-  const core = kit.box(inch(8), pH, inch(8), timber, { r: inch(0.12), seg: 2, uv: true });
+  const core = kit.box(P.post.w, pH, P.post.d, timber, { r: inch(0.12), seg: 2, uv: true });
   core.position.y = pH / 2;
   post.add(core);
   for (const side of [0, 1, 2, 3]) {
@@ -874,7 +909,7 @@ function buildEntry(ctx, locals, G) {
       post.add(reed);
     }
   }
-  post.position.set(P.post.at[0], P.floorY, P.post.at[1] + 0.55);
+  post.position.set(P.post.at[0], P.floorY, P.post.at[1]);
   g.add(post);
 
   // ---- angled corbel brackets under the beam -----------------------------
@@ -887,17 +922,9 @@ function buildEntry(ctx, locals, G) {
     knee.position.set(x, CEIL_Y.first - P.beamDepth - inch(12), z - w / 2 + inch(4));
     g.add(knee);
   };
-  bracketAt(P.post.at[0], P.post.at[1] + 0.2, inch(20));
-  bracketAt(px0 + inch(5), pz1 + 0.4, inch(20));
-  bracketAt(px1 - inch(5), pz1 + 0.4, inch(20));
-
-  // ---- coir doormat, slightly askew --------------------------------------
-  const mat = kit.box(2.5, inch(0.9), 1.5, locals.trim(), { r: inch(0.35), seg: 2 });
-  mat.material = mkMat(ctx, 'doormat', { color: 0x8d6f47, roughness: 0.98 });
-  mat.rotation.y = deg(2.6);
-  mat.position.set(33.55, P.floorY + inch(0.45), 43.35);
-  mat.castShadow = false;
-  g.add(mat);
+  bracketAt(P.post.at[0], P.post.at[1] - inch(3), inch(20));
+  bracketAt(px0 - inch(9), pz1 + 0.55, inch(22));
+  bracketAt(px1 + inch(9), pz1 + 0.55, inch(22));
 
   // ---- house numbers "1430" ----------------------------------------------
   const numbers = new THREE.Group();
@@ -913,37 +940,47 @@ function buildEntry(ctx, locals, G) {
   // ---- doorbell + recessed porch downlight --------------------------------
   const bell = kit.cyl(inch(0.8), inch(0.8), inch(0.5), locals.metal(), 16);
   bell.rotation.x = Math.PI / 2;
-  bell.position.set(35.35, 3.85, 42.309 - inch(1.2));
+  bell.position.set(34.95, 3.40, 42.309 + inch(1.2));
   g.add(bell);
 
   const canTrim = kit.torus(inch(3.2), inch(0.6), locals.trim(), 24, 6);
   canTrim.rotation.x = Math.PI / 2;
-  canTrim.position.set(33.6, CEIL_Y.first - inch(3.2), 43.6);
+  canTrim.position.set(33.30, CEIL_Y.first - inch(3.2), 43.55);
   g.add(canTrim);
   const canLens = new THREE.Mesh(new THREE.CircleGeometry(inch(3.0), 24),
     mkMat(ctx, 'porchLens', { color: 0xfff3e0, emissive: 0xffdfae, emissiveIntensity: 3.0, roughness: 0.4 }));
   canLens.rotation.x = Math.PI / 2;
-  canLens.position.set(33.6, CEIL_Y.first - inch(3.4), 43.6);
+  canLens.position.set(33.30, CEIL_Y.first - inch(3.4), 43.55);
   g.add(canLens);
   if (ctx.lights && ctx.lights.recessedCan) {
     try {
-      const can = ctx.lights.recessedCan([33.6, CEIL_Y.first - inch(4), 43.6],
+      const can = ctx.lights.recessedCan([33.30, CEIL_Y.first - inch(4), 43.55],
         { intensity: 26, temp: 2900, angle: deg(62), castShadow: false });
       if (can && can.group) g.add(can.group);
     } catch { /* optional */ }
   }
 
   // ---- the round louvered vent half-buried by the porch floor -------------
-  const v = louveredVent(ctx, ft(1, 0), { locals, panelW: ft(2, 8), panelH: ft(2, 8) });
-  v.position.set(28.35, 1.55, 42.309 - inch(0.5));
+  // MEASURED off exterior_view_of_front_door.png (back-projected onto the front
+  // plane): the vent centre lands at x 25.1, y 2.2 and the little square window
+  // directly above it at x 24.9, y 5.25 — both on the FRONT wall west of the
+  // post, both facing +Z, with the vent's bottom third lost behind the shrub.
+  const v = louveredVent(ctx, ft(1, 1), { locals, panel: false });
+  v.position.set(25.10, 2.15, 45.143 - inch(0.2));
   v.rotation.y = Math.PI;
   g.add(v);
-  // the small square black-framed window left of the post
-  const sq = kit.window({ w: 1.15, h: 1.15, type: 'fixed' },
+  const sq = kit.window({ w: 1.35, h: 1.45, type: 'fixed' },
     { wall: WALL.ext, casing: false, frame: locals.frameDark(), glass: locals.glass() });
-  sq.position.set(28.4, 4.6, 42.309);
+  sq.position.set(24.92, 4.52, 45.143);
   sq.rotation.y = Math.PI;
   g.add(sq);
+  for (const [dx, dy, cw, ch] of [[-0.78, 0.725, inch(3.4), 1.45 + inch(6.8)],
+    [0.78, 0.725, inch(3.4), 1.45 + inch(6.8)], [0, 1.45 + inch(3.4), 1.35 + inch(6.8), inch(3.4)],
+    [0, -inch(3.4), 1.35 + inch(6.8), inch(3.4)]]) {
+    const c = kit.box(cw, ch, inch(1.2), trim, { r: inch(0.06), uv: true });
+    c.position.set(24.92 + dx, 4.52 + dy, 45.143 + WALL.ext / 2 + inch(0.8));
+    g.add(c);
+  }
 
   // ---- sidelights beside the front door -----------------------------------
   // dims puts them on ext-first-6 as ordinary windows; they are already built
@@ -1055,12 +1092,19 @@ function buildServiceDetails(ctx, locals, G) {
 
   // the second signature round vent, high on the front wall west of the entry,
   // with the small square window directly above it (front_leftside_of_house).
-  const v = louveredVent(ctx, ft(1, 0), { locals, panelW: ft(2, 10), panelH: ft(3, 4) });
-  v.position.set(30.3, 14.1, 45.143);
+  // MEASURED off exterior_view_of_front_door.png: the second-storey vent
+  // back-projects to x 15.4, y 12.1 with the small window at y 14.8 directly
+  // above it — i.e. it sits BETWEEN the second-floor window groups on the west
+  // wing, not beside the entry box. It also has to face +Z (it was rotated
+  // into the wall before), which is why it never appeared in a render.
+  const v = louveredVent(ctx, ft(1, 0), { locals, panel: false });
+  v.position.set(14.70, 12.10, 45.143 - inch(0.2));
+  v.rotation.y = Math.PI;
   g.add(v);
   const sq = kit.window({ w: 2.0, h: 1.5, type: 'fixed' },
     { wall: WALL.ext, casing: false, frame: locals.frameDark(), glass: locals.glass() });
-  sq.position.set(30.3, 16.1, 45.143);
+  sq.position.set(14.70, 14.80, 45.143);
+  sq.rotation.y = Math.PI;
   g.add(sq);
   // and a small one on the one-storey living wing's east wall
   const v2 = louveredVent(ctx, ft(0, 9), { locals, panelW: ft(2, 2), panelH: ft(2, 2) });

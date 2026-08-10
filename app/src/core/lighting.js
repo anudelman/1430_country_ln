@@ -1136,11 +1136,15 @@ export const LIGHT_PRESETS = Object.freeze({
     exposure: 0.95,
     env: { kind: 'sky', turbidity: 2.3, intensity: 1.0 },
     sun: {
-      azimuth: 132, elevation: 56, intensity: 9.6, color: 0xfff4e2,
-      hemiIntensity: 0.52, skyColor: 0x9cbde9, groundColor: 0x7e8158,
+      // PHOTOGRAPHY §6.3: exterior sun : sky-fill = 5 : 1 LINEAR. The hemi and
+      // the sky env together have to carry ~17% of the total, or the shaded
+      // elevations crush and the frame stops looking like a bracketed merge.
+      // Ground colour is the warm dry-turf bounce, never a neutral grey.
+      azimuth: 132, elevation: 56, intensity: 7.4, color: 0xfff2dc,
+      hemiIntensity: 1.15, skyColor: 0xa6c4e8, groundColor: 0xa89a6c,
       normalBias: 0.02, bias: -0.00035,
     },
-    fill: { intensity: 0.16, color: 0xdfe9f7, groundColor: 0x8f9a6d },
+    fill: { intensity: 0.34, color: 0xffeedd, groundColor: 0xa39569 },
     can: { temp: 2900, intensity: 40 },
     pendant: { temp: 2700, intensity: 18 },
     window: { intensity: 1.2, color: 0x2a2f33, glowIntensity: 0.6 },

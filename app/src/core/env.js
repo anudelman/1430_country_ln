@@ -102,8 +102,26 @@ uniform float uGlowPower;
 uniform float uGradient;
 uniform float uHaze;
 uniform float uIntensity;
+uniform float uCirrus;
+uniform vec2  uCirrusDir;
 
 varying vec3 vWorldPos;
+
+/* --- value noise + fbm, for the thin high cirrus ---------------------- */
+float vhash( vec2 p ) {
+  return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453123 );
+}
+float vnoise( vec2 p ) {
+  vec2 i = floor( p ), f = fract( p );
+  vec2 u = f * f * ( 3.0 - 2.0 * f );
+  return mix( mix( vhash( i ), vhash( i + vec2( 1.0, 0.0 ) ), u.x ),
+              mix( vhash( i + vec2( 0.0, 1.0 ) ), vhash( i + vec2( 1.0, 1.0 ) ), u.x ), u.y );
+}
+float fbm2( vec2 p ) {
+  float a = 0.5, s = 0.0;
+  for ( int i = 0; i < 5; i++ ) { s += a * vnoise( p ); p *= 2.03; a *= 0.5; }
+  return s;
+}
 
 void main() {
   vec3 dir = normalize( vWorldPos - cameraPosition );
@@ -128,6 +146,19 @@ void main() {
   float ang  = acos( cosG );
   float disc = 1.0 - smoothstep( uSunAngular * 0.55, uSunAngular * 1.6, ang );
   col += uSunColor * ( uSunDisc * disc );
+
+  // Thin, streaky high cirrus. Every exterior in the reference set has a few
+  // faint horsetail wisps in the upper sky; a perfectly clean gradient is a
+  // tell all by itself. Projected onto a flat "cloud deck" so the streaks
+  // converge toward the horizon the way real cirrus does.
+  if ( uCirrus > 0.0 && up > 0.02 ) {
+    vec2 cp = dir.xz / max( up, 0.02 );
+    cp = vec2( dot( cp, uCirrusDir ), dot( cp, vec2( -uCirrusDir.y, uCirrusDir.x ) ) );
+    float f = fbm2( vec2( cp.x * 0.09, cp.y * 0.55 ) + 11.0 );
+    float wisp = smoothstep( 0.54, 0.86, f ) * smoothstep( 0.02, 0.35, up )
+               * ( 1.0 - smoothstep( 0.62, 1.0, up ) * 0.55 );
+    col = mix( col, col + uSunColor * 0.55 + vec3( 0.10, 0.12, 0.14 ), wisp * uCirrus );
+  }
 
   // Ground half: lawn / paving bounce, so nothing in the scene is lit from a
   // black lower hemisphere.
@@ -174,6 +205,10 @@ export function makeSkyEnv(renderer, {
   resolution,
   skyRadius = 3000,
   quality,
+  /** Thin high cirrus, 0 = none. The reference exteriors read ~0.30. */
+  cirrus = 0.30,
+  /** Bearing the wisps run along, radians. */
+  cirrusAngle = 0.62,
 } = {}) {
   const profile = qualityProfile(quality || (renderer && renderer.userData && renderer.userData.quality));
   const res = resolution || profile.envResolution;
@@ -185,17 +220,23 @@ export function makeSkyEnv(renderer, {
   const paleness = clamp((turbidity - 1) / 9, 0, 1);
   const elevF = clamp(sunElevation / 60, 0, 1);
 
+  // MEASURED against straight_on_view_of_house_from_street.png:
+  //   top of frame (up ~0.47)  R 130 / G 171 / B 254, blue channel CLIPPED
+  //   lower sky   (up ~0.30)   R 155 / G 187 / B 252
+  // i.e. a deep, strongly blue-dominant sky that only pales in the last few
+  // degrees above the treeline. The previous constants put a near-white
+  // horizon 35% of the way up the frame, which read as an overcast haze.
   const K = radianceScale;
   const zenith = new THREE.Color().setRGB(
-    K * THREE.MathUtils.lerp(0.075, 0.30, paleness) * THREE.MathUtils.lerp(0.55, 1.0, elevF),
-    K * THREE.MathUtils.lerp(0.185, 0.36, paleness) * THREE.MathUtils.lerp(0.60, 1.0, elevF),
-    K * THREE.MathUtils.lerp(0.480, 0.62, paleness) * THREE.MathUtils.lerp(0.75, 1.0, elevF),
+    K * THREE.MathUtils.lerp(0.190, 0.40, paleness) * THREE.MathUtils.lerp(0.55, 1.0, elevF),
+    K * THREE.MathUtils.lerp(0.460, 0.62, paleness) * THREE.MathUtils.lerp(0.60, 1.0, elevF),
+    K * THREE.MathUtils.lerp(1.420, 1.42, paleness) * THREE.MathUtils.lerp(0.75, 1.0, elevF),
     THREE.LinearSRGBColorSpace
   );
   const horizon = new THREE.Color().setRGB(
-    K * THREE.MathUtils.lerp(0.62, 0.90, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[0]),
-    K * THREE.MathUtils.lerp(0.68, 0.90, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[1]),
-    K * THREE.MathUtils.lerp(0.80, 0.94, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[2]),
+    K * THREE.MathUtils.lerp(0.50, 0.78, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[0]),
+    K * THREE.MathUtils.lerp(0.66, 0.86, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[1]),
+    K * THREE.MathUtils.lerp(1.30, 1.42, paleness) * (0.55 + 0.45 * elevF) * (0.75 + 0.25 * trans.rgb[2]),
     THREE.LinearSRGBColorSpace
   );
   const sunColor = new THREE.Color().setRGB(
@@ -213,9 +254,11 @@ export function makeSkyEnv(renderer, {
     uSunAngular: { value: 1.6 * DEG },
     uGlow: { value: 0.30 },
     uGlowPower: { value: 70.0 },
-    uGradient: { value: 0.55 },
+    uGradient: { value: 0.42 },
     uHaze: { value: 0.16 },
     uIntensity: { value: intensity },
+    uCirrus: { value: cirrus },
+    uCirrusDir: { value: new THREE.Vector2(Math.cos(cirrusAngle), Math.sin(cirrusAngle)) },
   };
 
   const material = new THREE.ShaderMaterial({

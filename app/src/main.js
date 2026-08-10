@@ -331,6 +331,9 @@ async function loadPresets() {
     if (!p.level) p.level = (raw[id] && raw[id].level) || (p.room && PIECE_BY_ID[p.room] ? PIECE_BY_ID[p.room].level : null);
     if (!p.level) p.level = 'first';
     if (p.exposure === undefined) p.exposure = raw[id] ? raw[id].exposure ?? null : null;
+    // Per-preset PhotoFinish overrides (saturation, rolloff, sharpen, lift…).
+    // Interiors and exteriors are two different grades — PHOTOGRAPHY §2.4.
+    if (p.post === undefined) p.post = (raw[id] && raw[id].post) || null;
   }
   return PRESETS;
 }
@@ -804,6 +807,11 @@ function applyPresetToCamera(p) {
   }
   applyLens(camera, { aspect });
   if (p.exposure) renderer.toneMappingExposure = p.exposure;
+  if (composer && mod.post && typeof mod.post.setPhotoFinish === 'function') {
+    const grade = Object.assign({}, mod.post.PHOTO_DEFAULTS || {}, p.post || {});
+    delete grade.exposure;   // renderer.toneMappingExposure owns that
+    mod.post.setPhotoFinish(composer, grade);
+  }
   if (lightRig && lightRig.fill && typeof lightRig.fill.follow === 'function') lightRig.fill.follow(camera);
   if (dom.presetJump) dom.presetJump.value = p.key;
   // Interactive: park in "preset" mode so the framing stays EXACTLY the
