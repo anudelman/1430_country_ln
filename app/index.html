@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>1430 Country Ln — walkthrough</title>
+
+<!--
+  The one and only import map. CONVENTIONS §4: three is imported by the BARE
+  specifier 'three' everywhere in the project; never a CDN URL. tools/serve.mjs
+  serves the repo root, so /node_modules/... resolves in dev, and
+  tools/bundle.mjs replaces this whole block with inlined blob modules for
+  dist/walkthrough.html (which must work from file:// with no server).
+-->
+<script type="importmap">
+{
+  "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/",
+    "three/examples/jsm/": "/node_modules/three/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+  :root {
+    --ui-bg: rgba(18, 20, 24, 0.86);
+    --ui-fg: #e7e9ee;
+    --ui-dim: #99a0ad;
+    --ui-line: rgba(255, 255, 255, 0.13);
+    --ui-accent: #6fb0ff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%;
+    background: #0d0f12; color: var(--ui-fg);
+    overflow: hidden;
+    font: 13px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #view { position: fixed; inset: 0; display: block; }
+  canvas#c { display: block; width: 100%; height: 100%; outline: none; }
+
+  /* ---- loading overlay ------------------------------------------------ */
+  #overlay {
+    position: fixed; inset: 0; z-index: 40;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; background: #0d0f12;
+    transition: opacity .35s ease;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #overlay .title { font-size: 15px; letter-spacing: .09em; text-transform: uppercase; color: var(--ui-dim); }
+  #overlay .bar { width: 240px; height: 2px; background: rgba(255,255,255,.12); overflow: hidden; border-radius: 2px; }
+  #overlay .bar i { display: block; height: 100%; width: 30%; background: var(--ui-accent);
+    animation: slide 1.15s cubic-bezier(.6,.05,.3,.95) infinite; }
+  @keyframes slide { 0% { transform: translateX(-110%);} 100% { transform: translateX(360%);} }
+  #status { color: var(--ui-dim); font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; min-height: 1.5em; }
+  #overlay.error .bar { display: none; }
+  #overlay.error #status { color: #ff8f7a; white-space: pre-wrap; max-width: 76ch; text-align: left;
+    max-height: 60vh; overflow: auto; }
+
+  /* ---- HUD ------------------------------------------------------------ */
+  #hud {
+    position: fixed; top: 12px; left: 12px; z-index: 30;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 10px 11px 11px;
+    background: var(--ui-bg); border: 1px solid var(--ui-line); border-radius: 9px;
+    backdrop-filter: blur(9px);
+    max-width: 274px;
+    user-select: none;
+  }
+  #hud.collapsed > .body { display: none; }
+  #hud .head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  #hud .head b { font-size: 12px; letter-spacing: .05em; font-weight: 600; }
+  #hud .head span { color: var(--ui-dim); font-size: 11px; margin-left: auto; }
+  #hud .body { display: flex; flex-direction: column; gap: 9px; }
+  #hud label { display: block; color: var(--ui-dim); font-size: 10px;
+    letter-spacing: .1em; text-transform: uppercase; margin-bottom: 3px; }
+  #hud select, #hud button {
+    font: inherit; font-size: 12px; color: var(--ui-fg);
+    background: rgba(255,255,255,.06); border: 1px solid var(--ui-line);
+    border-radius: 6px; padding: 5px 7px; width: 100%;
+  }
+  #hud select { appearance: none; cursor: pointer; }
+  #hud select option { background: #171a1f; color: var(--ui-fg); }
+  #hud .row { display: flex; gap: 6px; }
+  #hud .row button { flex: 1 1 0; cursor: pointer; white-space: nowrap; padding: 5px 4px; }
+  #hud button:hover { background: rgba(255,255,255,.12); }
+  #hud button.on { background: var(--ui-accent); border-color: var(--ui-accent); color: #08111d; font-weight: 600; }
+  #hud .hint { color: var(--ui-dim); font-size: 10.5px; line-height: 1.5; }
+  #hud .warn { color: #ffc48a; font-size: 10.5px; line-height: 1.45; white-space: pre-wrap; }
+
+  #readout {
+    position: fixed; bottom: 10px; left: 12px; z-index: 30;
+    padding: 5px 8px; border-radius: 6px;
+    background: var(--ui-bg); border: 1px solid var(--ui-line);
+    color: var(--ui-dim); font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace;
+    white-space: pre;
+  }
+
+  /* Deterministic screenshot state: nothing but the canvas exists. */
+  body.shot #hud, body.shot #readout, body.shot #overlay { display: none !important; }
+  body.shot { background: #000; }
+  body.shot canvas#c { width: auto; height: auto; }
+</style>
+</head>
+<body>
+
+<div id="view"><canvas id="c" tabindex="0"></canvas></div>
+
+<div id="overlay">
+  <div class="title">1430 Country Ln</div>
+  <div class="bar"><i></i></div>
+  <div id="status">booting…</div>
+</div>
+
+<div id="hud" hidden>
+  <div class="head" id="hudHead"><b>WALKTHROUGH</b><span id="hudToggle">–</span></div>
+  <div class="body">
+    <div>
+      <label>Level</label>
+      <div class="row" id="levelRow">
+        <button data-level="basement">Bsmt</button>
+        <button data-level="first">1st</button>
+        <button data-level="second">2nd</button>
+        <button data-level="exterior">Ext</button>
+      </div>
+    </div>
+    <div>
+      <label>Jump to room</label>
+      <select id="roomJump"><option value="">— select —</option></select>
+    </div>
+    <div>
+      <label>Listing-photo camera</label>
+      <select id="presetJump"><option value="">— select —</option></select>
+    </div>
+    <div>
+      <label>Mode / quality</label>
+      <div class="row">
+        <button id="modeBtn" title="W A S D to walk, mouse to look, Shift to run">Walk</button>
+        <button id="qualityBtn" title="draft ⇄ medium ⇄ high">high</button>
+      </div>
+    </div>
+    <div class="hint" id="hint">
+      Click the view to capture the mouse. <b>WASD</b> move · <b>Shift</b> run ·
+      <b>Q/E</b> lens shift · <b>1/2/3</b> level · <b>Esc</b> release.
+    </div>
+    <div class="warn" id="warnBox" hidden></div>
+  </div>
+</div>
+
+<div id="readout" hidden></div>
+
+<script type="module">
+  // Boot. Any failure here must show up in the overlay, never as a white page.
+  const status = document.getElementById('status');
+  const overlay = document.getElementById('overlay');
+  window.__READY__ = false;
+  window.__BOOT_ERROR__ = null;
+  window.__STATUS__ = 'boot';
+  window.__WARNINGS__ = [];
+  try {
+    await import('./src/main.js');
+  } catch (err) {
+    const msg = (err && (err.stack || err.message)) || String(err);
+    window.__BOOT_ERROR__ = msg;
+    window.__STATUS__ = 'error';
+    window.__READY__ = false;
+    overlay.classList.remove('hidden');
+    overlay.classList.add('error');
+    status.textContent = 'main.js failed to load\n\n' + msg;
+    console.error('[boot]', err);
+  }
+</script>
+</body>
+</html>
