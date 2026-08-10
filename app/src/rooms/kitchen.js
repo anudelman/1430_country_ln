@@ -584,6 +584,11 @@ export function build(ctx) {
       intensity: canCfg.intensity === undefined ? 46 : canCfg.intensity,
       temp: canCfg.temp || 2900,
       apertureIn: 6, trimIn: 7.2,
+      // Cans deliberately do NOT cast. Their trim ring sits in the ceiling plane,
+      // so a shadow-casting can occludes its own ceiling: enabling it dropped the
+      // measured ceiling from [194,196,196] to [142,147,153] against a photo
+      // reference of [189,189,189]. The island's contact shadow comes from the
+      // pendant spots below instead, which is also where it comes from in reality.
       castShadow: false,
       quality: ctx.quality,
     });
@@ -594,10 +599,26 @@ export function build(ctx) {
     const p = kit.pendantBlackShadeBrassChain({ dropLen: 2.75, shadeD: 1.05 });
     p.position.set(px, CEIL_Y, ISL_CZ);
     group.add(p);
-    const pl = new THREE.PointLight(0xffdcae, 13, 0, 2);
+    // SpotLight rather than PointLight: a point light's shadow is a six-face
+    // cube, six times the cost for a fixture that only throws light downward.
+    const pl = new THREE.SpotLight(0xffdcae, 26, 0, Math.PI * 0.46, 0.7, 2);
     pl.position.set(px, CEIL_Y - 2.55, ISL_CZ);
-    pl.castShadow = false;
+    pl.target.position.set(px, 0, ISL_CZ);
+    pl.castShadow = true;
+    pl.shadow.mapSize.set(1024, 1024);
+    pl.shadow.bias = -0.0006;
+    pl.shadow.normalBias = 0.02;
     group.add(pl);
+    group.add(pl.target);
+    // The spot only throws DOWNWARD, so on its own it left the ceiling unlit and
+    // dropped it from [194,196,196] to [142,147,153] against a [189,189,189]
+    // reference. A real open-top cone shade washes the ceiling as well as the
+    // island, so the upward half is restored as a small non-shadowing point light
+    // above the shade — cheap, and it keeps the cube-shadow cost off the budget.
+    const up = new THREE.PointLight(0xffdcae, 5.5, 0, 2);
+    up.position.set(px, CEIL_Y - 1.9, ISL_CZ);
+    up.castShadow = false;
+    group.add(up);
   }
 
   const ucInt = (preset && preset.underCabinet && preset.underCabinet.intensity) || 3.0;

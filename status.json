@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-10T03:46:24.537Z",
+  "updated": "2026-08-10T19:52:54.813Z",
   "house": "1430 Country Ln",
   "photoDir": "listing_photos",
   "renderDir": "renders",
@@ -134,13 +134,13 @@
         "listing_photos/Kitchen_view_4.png",
         "listing_photos/kitchen_view_5.png"
       ],
-      "round": 0,
-      "verdict": "PENDING",
+      "round": 1,
+      "verdict": "PICKED_RENDER",
       "confidence": null,
-      "gap": "",
+      "gap": "No direct-light shadowing: island casts no contact shadow on the floor, no AO at the toe-kick. Also flat untextured stainless with no environment reflection, quartz veining reading as a surface decal, and a matte tiling oak floor with no anisotropic sheen.",
       "history": [],
       "notes": [],
-      "renderStamp": 0
+      "renderStamp": 1786391553709
     },
     {
       "id": "breakfast-nook",

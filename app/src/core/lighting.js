@@ -441,7 +441,12 @@ export function recessedCan(pos, {
   penumbra = 0.85,
   decay = 2,
   distance = 0,
-  castShadow = false,
+  // Default ON. A blind critic's verdict on the kitchen was decided by this:
+  // "there is not a single cast shadow anywhere - the island casts nothing onto
+  // the floor, the range casts nothing". With the cans and pendants not casting,
+  // an interior has no direct light shadowing at all and reads as a flat ambient
+  // dome. Still gated by profile.softShadows below, so draft quality stays cheap.
+  castShadow = true,
   apertureIn = 4.5,
   trimIn = 5.4,
   recessIn = 1.1,
@@ -563,7 +568,7 @@ export function fixtureBulb(pos = [0, 0, 0], {
   gain = 4.0,
   decay = 2,
   distance = 0,
-  castShadow = false,
+  castShadow = true,   // see recessedCan: interiors had no cast shadows at all
   opacity = 1,
   quality,
   name = 'bulb',
