@@ -138,7 +138,7 @@ const ALL_PIECES = {
     photos: ['view_from_kitchen_of_living_room_looking_out_to_backyard.png'],
     brief: `THE ROOM WITH THE REAR WINDOW WALL. This piece is called "living" after the photo
       filename, but on the floor plan it is the FAMILY ROOM, 12'1" x 19'8" — use that room in
-      dims.js. This room is NOT sunken (the sunken room is the fireplace room, piece `family`).
+      dims.js. This room is NOT sunken (the sunken room is the fireplace room, piece "family").
       A REAR WINDOW WALL of white-framed floor-to-ceiling glass: a run of large fixed/slider panels
       plus a WHITE FRENCH DOOR with a brass lever handle at the right, opening onto the composite
       deck. A SINGLE SQUARE WHITE SUPPORT COLUMN stands mid-room in front of the glass. CROWN
