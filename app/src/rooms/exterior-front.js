@@ -223,7 +223,12 @@ function layFlagstone(ctx, parent, material, x0, z0, x1, z1, y, seed) {
       const w = 1.4 + frac(k++ * 2.3) * 1.9;
       const xb = Math.min(x1, x + w);
       const s = kit.box(xb - x - J, inch(1.5), zb - za - J, material,
-        { r: inch(0.28), seg: 1, uv: true });
+        { r: inch(0.28), seg: 1 });
+      // 22 ft per repeat lands each slab INSIDE one cell of the bluestone map,
+      // with a per-slab offset for variety. At the map's own 6 ft scale every
+      // slab carried a fragment of a baked cell outline and the walk read as
+      // crazy paving laid on top of ashlar.
+      applyUV(s, 22, { axes: 'xz', size: [xb - x, zb - za], offset: [frac(k * 1.9), frac(k * 4.7)] });
       s.position.set((x + xb) / 2, y, (za + zb) / 2);
       // a paver is never dead level or dead square
       s.rotation.y = deg((frac(k * 5.1) - 0.5) * 1.6);
@@ -460,9 +465,12 @@ export function buildSitePlanting(ctx) {
     const z = 52.0 + Math.sin(t * 5.1) * 1.6 + (frac(i * 9.1) - 0.5) * 1.2;
     skirt.push({ x, z, r: 0.55 + frac(i * 4.4) * 0.5 });
   }
+  // This run used to be laid at x 33.5..43.5, z 51.5 — which is the middle of
+  // the bluestone walk. Moved into the mulch EAST of the walk, where the
+  // photographs actually show it (exterior_view_of_front_door bottom-right).
   for (let i = 0; i < 14; i++) {
     const t = i / 14;
-    skirt.push({ x: 33.5 + t * 10 + (frac(i * 2.2) - 0.5), z: 51.5 + (frac(i * 6.1) - 0.5) * 2.4, r: 0.5 + frac(i * 8.8) * 0.45 });
+    skirt.push({ x: 41.8 + t * 7.5 + (frac(i * 2.2) - 0.5), z: 50.0 + t * 9.0 + (frac(i * 6.1) - 0.5) * 1.6, r: 0.5 + frac(i * 8.8) * 0.45 });
   }
   if (!draft) {
     for (let i = 0; i < skirt.length; i++) {
@@ -504,7 +512,7 @@ export function applyExteriorDaylight(ctx) {
   if (!scene || (scene.userData && scene.userData.__extDaylight)) return;
   if (scene.userData) scene.userData.__extDaylight = true;
 
-  const bounce = new THREE.HemisphereLight(0xd7e3f2, 0xc4b586, 0.78);
+  const bounce = new THREE.HemisphereLight(0xe6e4dc, 0xc9b183, 0.50);
   bounce.name = 'exterior:groundBounce';
   bounce.position.set(30, 0, 45);
   scene.add(bounce);
@@ -512,7 +520,7 @@ export function applyExteriorDaylight(ctx) {
   // A very soft warm fill from the sun's side keeps the shaded elevations off
   // black without touching the sunlit ones (they are already at the top of the
   // curve). This is the "bracketed exposure" term, not a second key.
-  const fill = new THREE.DirectionalLight(0xffe9cf, 0.72);
+  const fill = new THREE.DirectionalLight(0xffe9cf, 0.26);
   fill.name = 'exterior:warmFill';
   fill.position.set(120, 40, 150);
   fill.castShadow = false;

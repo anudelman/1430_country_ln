@@ -188,24 +188,30 @@ function buildStoop(ctx, g) {
   // stone 96-126, always blue-grey, never the near-white the first pass gave.
   // The tones are deliberately spread ~18% so no two adjacent slabs match.
   const stone = ctx.mat && ctx.mat.bluestone;
+  // These are MULTIPLIERS over the bluestone map, which already carries the
+  // stone's own albedo (126,129,132). Tinting them to the sampled sRGB value
+  // double-darkens and drops the paving to L 55 — the first pass did exactly
+  // that. A +/-12% spread is what makes adjacent slabs read as separate stones.
   const tones = [
-    mat(ctx, 'stoneA', { color: 0x6f757c }, 'bluestone'),
-    mat(ctx, 'stoneB', { color: 0x646a72 }, 'bluestone'),
-    mat(ctx, 'stoneC', { color: 0x787d81 }, 'bluestone'),
-    mat(ctx, 'stoneD', { color: 0x5d656e }, 'bluestone'),
-    mat(ctx, 'stoneE', { color: 0x71736f }, 'bluestone'),
-    mat(ctx, 'stoneF', { color: 0x6a7079 }, 'bluestone'),
+    mat(ctx, 'stoneA', { color: 0xa9aeb5 }, 'bluestone'),
+    mat(ctx, 'stoneB', { color: 0x9aa1aa }, 'bluestone'),
+    mat(ctx, 'stoneC', { color: 0xb5b3ae }, 'bluestone'),
+    mat(ctx, 'stoneD', { color: 0x939ba4 }, 'bluestone'),
+    mat(ctx, 'stoneE', { color: 0xaeaba3 }, 'bluestone'),
+    mat(ctx, 'stoneF', { color: 0xa3a8af }, 'bluestone'),
   ];
-  if (!stone) tones.forEach((m) => { m.color.setHex(0x6a7079); });
+  if (!stone) tones.forEach((m) => { m.color.setHex(0x8d9299); });
 
   const grp = new THREE.Group();
   grp.name = 'entry:stoop';
   g.add(grp);
 
   /* ---- the mortar bed the slabs sit in ---------------------------------- */
-  const mortar = mat(ctx, 'mortar', { color: 0xb3b0a7, roughness: 0.97 }, 'concreteDriveway');
+  const mortar = mat(ctx, 'mortar', { color: 0xd9d5c9, roughness: 0.97 }, 'concreteDriveway');
   const bed = kit.box(sx1 - sx0 + 0.5, 0.62, sz1 - sz0 + 0.4, mortar, { r: inch(0.5), seg: 2, uv: true });
-  bed.position.set((sx0 + sx1) / 2, STOOP_Y - inch(1.45) - 0.31 + inch(0.6), (sz0 + sz1) / 2);
+  // The bed's top sits 0.3" under the stone face so the joints read as a pale
+  // mortar line rather than as a black slot between two slabs.
+  bed.position.set((sx0 + sx1) / 2, STOOP_Y - inch(0.30) - 0.31, (sz0 + sz1) / 2);
   bed.receiveShadow = true;
   bed.castShadow = true;
   applyUV(bed, 5, { axes: 'xz', size: [sx1 - sx0, sz1 - sz0] });
@@ -255,7 +261,10 @@ function buildStoop(ctx, g) {
 
 function buildBeds(ctx, g) {
   const { THREE, kit } = ctx;
-  const mulch = mat(ctx, 'mulch', { color: 0x2a221b, roughness: 0.99 }, 'mulchBed');
+    // 0x2a221b over the mulch map took the bed to L 6 — solid black, and 11% of
+  // the frame below L 31 against the photograph's 4%. Shredded hardwood in
+  // open shade sits at L 30-60, warm brown, with the chips still legible.
+  const mulch = mat(ctx, 'mulch', { color: 0x7b6d5c, roughness: 0.99 }, 'mulchBed');
   const grp = new THREE.Group();
   grp.name = 'entry:beds';
   g.add(grp);
@@ -562,30 +571,21 @@ function buildPorchFill(ctx, g) {
   grp.name = 'entry:fill';
   g.add(grp);
 
-  // Ranges pulled in so the fill cannot reach the sunlit facade: at 26 ft it
-  // printed two bright pools on the garage wall in the straight-on elevation,
-  // which is a hotspot no midday exterior has.
-  const bounce = new THREE.PointLight(0xffe9cf, 18, 13, 2);
-  bounce.position.set(33.4, 1.1, 46.6);
-  bounce.castShadow = false;
+  // NO point lights. Four of them lived here for one round and every single
+  // one printed a specular blob on the door face and on the glazing — a hard
+  // little sun that no bracketed exposure ever produces, and the fastest way
+  // to be spotted. The porch keeps its openness from the sky dome, the ground
+  // bounce in exterior-front's daylight, and the soffit can, all of which are
+  // area-ish sources with no point highlight.
+  //
+  // What IS worth adding is the one thing a sky dome cannot do: the warm
+  // bounce off the sunlit bluestone apron back up onto the shaded underside of
+  // the soffit and the lower third of the door. A hemisphere light does that
+  // without a highlight, because it has no position.
+  const bounce = new THREE.HemisphereLight(0xf4e2c6, 0xd6cdbb, 0.30);
+  bounce.name = 'entry:stoneBounce';
+  bounce.position.set(33.4, 0.0, 46.0);
   grp.add(bounce);
-
-  const wash = new THREE.PointLight(0xfff0dc, 9, 9, 2);
-  wash.position.set(31.2, 4.4, 44.4);
-  wash.castShadow = false;
-  grp.add(wash);
-
-  const east = new THREE.PointLight(0xffeedd, 8, 9, 2);
-  east.position.set(38.2, 3.2, 44.2);
-  east.castShadow = false;
-  grp.add(east);
-
-  // The stone under the soffit still has to read as stone, so give the paving
-  // its own low bounce rather than lifting the whole scene's ambient.
-  const stoneBounce = new THREE.PointLight(0xf6e6cd, 8, 12, 2);
-  stoneBounce.position.set(33.4, 0.6, 43.8);
-  stoneBounce.castShadow = false;
-  grp.add(stoneBounce);
 }
 
 export default build;

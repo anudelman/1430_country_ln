@@ -152,12 +152,17 @@ function makeLocals(ctx) {
     // behind them; only the top corner of each pane carries a sky reflection.
     // envMapIntensity 1.55 turned every light into a sheet of blank blue sky
     // and cost the entry its single most recognisable feature.
+    // A transmissive MeshPhysicalMaterial renders the entry lights as a flat
+    // pale sheet — the plantation-shutter louvers behind them disappear
+    // completely, which is the one feature of this facade nobody could miss.
+    // Simple alpha glass with a strong specular is both cheaper and closer:
+    // you read the louvers, and the sky still slides across the top corner.
     glass: () => derive('extGlass', null, {
-      color: 0xd5dcdd, roughness: 0.045, metalness: 0.0,
-      transmission: 0.80, thickness: 0.05, ior: 1.52,
-      transparent: true, opacity: 1.0,
-      specularIntensity: 0.9, envMapIntensity: 0.62,
-      clearcoat: 0.85, clearcoatRoughness: 0.03,
+      color: 0xbcc9cc, roughness: 0.05, metalness: 0.0,
+      transmission: 0, transparent: true, opacity: 0.20,
+      specularIntensity: 1.0, envMapIntensity: 0.85,
+      clearcoat: 1.0, clearcoatRoughness: 0.02,
+      depthWrite: false,
       side: THREE.DoubleSide,
     }),
     /** Interior surface seen faintly through the glass. */
@@ -590,7 +595,7 @@ function buildOpening(ctx, locals, w, o, place, group) {
         // entry shutters in the photograph are open enough to see the street
         // through, not closed like the foyer's.
         shutters: shutters
-          ? { tilt: deg(8), panels: Math.max(1, Math.round(o.w / 2.0)), divider: 0.55, rod: true }
+          ? { tilt: deg(24), panels: Math.max(1, Math.round(o.w / 2.0)), divider: 0.55, rod: true }
           : false,
       }
     );

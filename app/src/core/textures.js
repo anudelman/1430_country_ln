@@ -1860,10 +1860,15 @@ function genAsphaltShingle(size) {
 function genBluestone(size) {
   const TU = 6.0, TV = 6.0;
   const s = blank(size, [TU, TV]);
-  const jointC = hexRGB('#8a877e');
+  // The joint is a MORTAR line barely lighter than the stone, and it has to be
+  // faint: this map is tiled under real, separately-modelled slabs, and a
+  // strong baked cell outline draws a second, crazy-paving set of joints
+  // across the real ones. Tones sampled off exterior_view_of_front_door: the
+  // stone is a blue-grey that lands at L 150-178 in sun, 96-126 in shade.
+  const jointC = hexRGB('#73767a');
   const tones = [
-    hexRGB('#7e8184'), hexRGB('#848789'), hexRGB('#787c80'), hexRGB('#888a89'),
-    hexRGB('#7b7f82'), hexRGB('#818385'), hexRGB('#868884'),
+    hexRGB('#666a6f'), hexRGB('#6d7174'), hexRGB('#61666b'), hexRGB('#717372'),
+    hexRGB('#64686d'), hexRGB('#6a6c70'), hexRGB('#6e716d'),
   ];
   for (let y = 0; y < size; y++) {
     const v01 = (y + 0.5) / size;
@@ -1874,7 +1879,7 @@ function genBluestone(size) {
       const w = warpT(u01, v01, 3, 3, 0.10, 3737);
       const cell = worleyT(w[0], w[1], 4, 4, 3737, 1);
       const border = cell.f2 - cell.f1;
-      const jw = 0.026;
+      const jw = 0.004;
       if (border < jw) {
         const k = smoothstep(0, jw, border);
         const n = fbmT(u01, v01, 200, 200, 2, 4);

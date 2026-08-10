@@ -998,25 +998,36 @@ export const OPENINGS = [
   // Rear glass wall of the plan's FAMILY ROOM (piece `living`): four large
   // lites plus a full-lite exterior door — the lower half of the two-storey
   // glazed box in backyard_straight_on_view_of_house.png.
-  { wall: 'ext-first-0', type: 'window', center: 2.7, w: 3.4, h: 6.3, sill: 1.0, note: 'rear glass wall, lite 1' },
-  { wall: 'ext-first-0', type: 'window', center: 6.4, w: 3.4, h: 6.3, sill: 1.0, note: 'rear glass wall, lite 2' },
+  // SOLVED off backyard_straight_on_view_of_house.png, not estimated. With the
+  // house's west corner (X = 0) at photo x 1122 and the second-floor set-back
+  // (X = 26.925) at photo x 699, the rear wall scales at 15.85 px/ft; the
+  // 8" siding courses run 10.6 px, which agrees. Back-projecting every mullion
+  // gives the run below. Note the ORDER: the door is at the EAST end of the
+  // run (X ~= 22.2), NOT in the middle — the earlier table had it mirrored.
+  // Glass sill sits 3-4" above the finished floor, head at 6'-9".
+  { wall: 'ext-first-0', type: 'window', center: 4.98, w: 3.66, h: 6.45, sill: 0.30, note: 'rear glass wall, lite 1' },
+  { wall: 'ext-first-0', type: 'window', center: 8.96, w: 3.79, h: 6.45, sill: 0.30, note: 'rear glass wall, lite 2' },
+  { wall: 'ext-first-0', type: 'window', center: 13.22, w: 3.97, h: 6.45, sill: 0.30, note: 'rear glass wall, lite 3' },
+  { wall: 'ext-first-0', type: 'window', center: 18.01, w: 4.48, h: 6.45, sill: 0.30, note: 'rear glass wall, lite 4 — white 2-panel slider' },
   {
     wall: 'ext-first-0',
     type: 'door',
-    center: 10.1,
-    w: 3.2,
-    h: ft(6, 10),
+    center: 22.24,
+    w: 3.47,
+    h: ft(6, 8),
     sill: 0,
     swing: 'right-out',
     note: 'full-lite exterior door to the deck, brass/bronze lever',
   },
-  { wall: 'ext-first-0', type: 'window', center: 14.0, w: 3.4, h: 6.3, sill: 1.0, note: 'rear glass wall, lite 3' },
-  { wall: 'ext-first-0', type: 'window', center: 17.7, w: 3.4, h: 6.3, sill: 1.0, note: 'rear glass wall, lite 4' },
-  { wall: 'ext-first-0', type: 'window', center: 23.5, w: 5.0, h: 6.3, sill: 1.0, note: 'breakfast nook rear' },
-  { wall: 'ext-first-0', type: 'window', center: 33.9, w: 8.0, h: 5.0, sill: 2.0, note: 'dining room rear bay glazing' },
+  // Between X 24.1 and 29.2 the photograph shows PLAIN SIDING — the breakfast
+  // nook's rear light is the slider above, not a separate unit. (An opening at
+  // X 23.5 landed exactly on the deck door and put a window where the wall is.)
+  { wall: 'ext-first-0', type: 'window', center: 33.15, w: 7.90, h: 4.5, sill: 2.1, note: 'dining room rear bay glazing' },
 
-  { wall: 'ext-first-2', type: 'window', center: 6.0, w: 5.5, h: 4.5, sill: 2.5, note: 'living room rear' },
-  { wall: 'ext-first-2', type: 'window', center: 13.5, w: 5.5, h: 4.5, sill: 2.5, note: 'living room rear' },
+  // Back-projected off backyard_straight_on_view_of_house: a TALL NARROW light
+  // hard against the dining-bay corner and a wide 2-lite window further west.
+  { wall: 'ext-first-2', type: 'window', center: 2.9, w: 2.6, h: 5.6, sill: 0.9, note: 'living room rear, tall narrow' },
+  { wall: 'ext-first-2', type: 'window', center: 17.2, w: 6.6, h: 3.6, sill: 2.9, note: 'living room rear' },
 
   { wall: 'ext-first-3', type: 'window', center: 8.0, w: 3.0, h: 4.5, sill: 2.5, note: 'living room east' },
   { wall: 'ext-first-3', type: 'window', center: 14.5, w: 3.0, h: 4.5, sill: 2.5, note: 'living room east' },
@@ -1107,10 +1118,17 @@ export const OPENINGS = [
   { wall: 'w-garage-w', type: 'door', center: 16.5, w: ft(3, 0), h: DH, sill: 0, swing: 'left-in', note: 'foyer to garage, 20-minute rated' },
 
   /* ---------------- second floor, exterior --------------------------- */
-  { wall: 'ext-second-0', type: 'window', center: 4.0, w: 6.0, h: 6.2, sill: 1.0, note: 'sunroom glass wall' },
-  { wall: 'ext-second-0', type: 'window', center: 11.0, w: 6.0, h: 6.2, sill: 1.0, note: 'sunroom glass wall' },
-  { wall: 'ext-second-0', type: 'window', center: 18.0, w: 6.0, h: 6.2, sill: 1.0, note: 'sunroom glass wall' },
-  { wall: 'ext-second-0', type: 'window', center: 23.9, w: 4.4, h: 6.2, sill: 1.0, note: 'sunroom glass wall' },
+  // FIVE lites, not four — counted directly in backyard_straight_on_view_of_house
+  // and stated in DETAILS.md ("2nd floor = 5 large fixed lites"). Mullion
+  // back-projection puts them on a 4.07 ft pitch from X 5.15 to X 21.43, with
+  // the glazed opening running X 3.15 -> 23.47 and siding either side.
+  // Sill is essentially AT the second-floor deck (the slat floor sits on a
+  // plenum above it) and the head lands at 16.0, just under the eave.
+  { wall: 'ext-second-0', type: 'window', center: 5.15, w: 3.80, h: 6.5, sill: 0.02, note: 'sunroom glass wall' },
+  { wall: 'ext-second-0', type: 'window', center: 9.22, w: 3.80, h: 6.5, sill: 0.02, note: 'sunroom glass wall' },
+  { wall: 'ext-second-0', type: 'window', center: 13.29, w: 3.80, h: 6.5, sill: 0.02, note: 'sunroom glass wall' },
+  { wall: 'ext-second-0', type: 'window', center: 17.36, w: 3.80, h: 6.5, sill: 0.02, note: 'sunroom glass wall' },
+  { wall: 'ext-second-0', type: 'window', center: 21.43, w: 3.80, h: 6.5, sill: 0.02, note: 'sunroom glass wall' },
 
   { wall: 'ext-second-2', type: 'window', center: 6.5, w: 5.0, h: 3.2, sill: 3.6, note: 'NE bedroom rear' },
 

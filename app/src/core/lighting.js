@@ -1140,8 +1140,8 @@ export const LIGHT_PRESETS = Object.freeze({
       // the sky env together have to carry ~17% of the total, or the shaded
       // elevations crush and the frame stops looking like a bracketed merge.
       // Ground colour is the warm dry-turf bounce, never a neutral grey.
-      azimuth: 132, elevation: 56, intensity: 7.4, color: 0xfff2dc,
-      hemiIntensity: 1.15, skyColor: 0xa6c4e8, groundColor: 0xa89a6c,
+      azimuth: 132, elevation: 56, intensity: 10.0, color: 0xfff0d4,
+      hemiIntensity: 0.86, skyColor: 0xcdd1cf, groundColor: 0xb9a778,
       normalBias: 0.02, bias: -0.00035,
     },
     fill: { intensity: 0.34, color: 0xffeedd, groundColor: 0xa39569 },
