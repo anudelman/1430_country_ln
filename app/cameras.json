@@ -961,14 +961,14 @@
   "room": "kitchen",
   "level": "first",
   "pos": [
-   29.9,
-   4,
-   27.6
+   29.8,
+   4.0,
+   21.9
   ],
   "target": [
-   14.2,
-   4,
-   19.4
+   15.5,
+   4.0,
+   27.4
   ],
   "fovV": 78.5,
   "shift": 0,
@@ -1136,14 +1136,14 @@
   "room": "primary-bath",
   "level": "second",
   "pos": [
-   25,
+   15.05,
    13.55,
-   18
+   16.1
   ],
   "target": [
-   14.6,
+   25.39,
    13.55,
-   9
+   10.01
   ],
   "fovV": 78.5,
   "shift": 0,
@@ -1153,8 +1153,7 @@
    1533,
    1014
   ],
-  "estimated": true,
-  "note": "Primary bath looking NW. A sliding glass door to the sunroom fills the left third with trees and lawn fully legible through it, the brown-tile shower with frameless glass and the drop-in tub occupy the centre, the WC door is open on the right, and a gabled skylight well opens the ceiling above. ~14.6 mm."
+  "note": "Primary bath looking NE from beside the vanity's SE corner. Slider to the sunroom fills the left third (trees legible), the bronze-tile corner shower and drop-in tub run across the centre, the W.C. door stands open at the right, skylight well overhead. Camera fitted photogrammetrically (f=623 px)."
  },
  "master_bedroom_bathroom_view_2": {
   "photo": "master_bedroom_bathroom_view_2.png",

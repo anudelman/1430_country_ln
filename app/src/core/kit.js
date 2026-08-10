@@ -887,10 +887,16 @@ export function makeKit(THREE, mat, tex) {
    * @anchor centre of the pull's mounting face, on the door face (z = 0),
    *         projecting toward +Z.
    */
-  function pull(style = 'brassBar', len = inch(5), material) {
+  function pull(style = 'brassBar', len = inch(5), material, postMaterial) {
     const g = G('face centre of the door, projecting +Z');
     if (style === 'none') return g;
-    const m = material || (style === 'blackBar' ? P.blackMetal : P.brassPolished);
+    // Two-tone styles seen at 1430 Country Ln (kitchen_view_1 close-ups):
+    //   'blackBrassBar'  matte-black bar with BRASS end posts (bases + island)
+    //   'nickelBar'      dark bar with brushed-nickel end posts (greige uppers)
+    let m = material || (style === 'blackBar' ? P.blackMetal : P.brassPolished);
+    let pm = postMaterial || m;
+    if (style === 'blackBrassBar') { m = P.blackMetal; pm = postMaterial || P.brassPolished; }
+    if (style === 'nickelBar') { m = P.blackMetal; pm = postMaterial || P.chrome; }
     const r = inch(0.28);
     const stand = inch(1.25);
     if (style === 'knob') {
@@ -913,10 +919,18 @@ export function makeKit(THREE, mat, tex) {
     const bar = box(len, r * 2, r * 2, m, { r: r * 0.55, seg: 2 });
     bar.position.z = stand;
     g.add(bar);
+    const twoTone = pm !== m;
     for (const s of [-1, 1]) {
-      const post = box(inch(0.34), inch(0.34), stand, m, { r: inch(0.05) });
+      const post = box(inch(0.34), inch(0.34), stand, pm, { r: inch(0.05) });
       post.position.set(s * (len / 2 - inch(0.4)), 0, stand / 2);
       g.add(post);
+      if (twoTone) {
+        // contrasting ferrule where the post meets the bar — the detail that
+        // makes the black-and-brass pulls read at photo distance
+        const fer = box(inch(0.5), inch(0.62), inch(0.62), pm, { r: inch(0.08), seg: 2 });
+        fer.position.set(s * (len / 2 - inch(0.4)), 0, stand);
+        g.add(fer);
+      }
     }
     return g;
   }
@@ -961,6 +975,43 @@ export function makeKit(THREE, mat, tex) {
       g.add(bh, bh2, bv, bv2);
     }
     g.userData.panelRect = [pw, ph];
+    return g;
+  }
+
+  /**
+   * Mitered raised-panel door / drawer face — a picture-frame stile ring, a
+   * bevel sloping INWARD, and a raised centre field proud of the bevel's foot.
+   * This is the door at 1430 Country Ln (kitchen bases/uppers, pantry): NOT a
+   * shaker.  The bevel throws the wide soft highlight band the photos show.
+   * @anchor face centre; the BACK of the slab is z = 0, the front is z = +thickness.
+   * @param {object} [o] {material, stileWidth, bevelWidth, thickness}
+   */
+  function raisedDoorPanel(w, h, o = {}) {
+    const stile = o.stileWidth === undefined ? inch(2.4) : o.stileWidth;
+    const bevel = o.bevelWidth === undefined ? inch(1.5) : o.bevelWidth;
+    const t = o.thickness === undefined ? inch(0.8) : o.thickness;
+    const m = o.material || P.wood;
+    const g = G('face centre, back at z=0', [w, h, t]);
+    const frameT = t;                          // stile ring at full thickness
+    const fieldT = t - inch(0.28);             // bevel drops, field rises back
+
+    // frame ring: a real plate with the panel opening punched through
+    const px = Math.max(0.06, w / 2 - stile), py = Math.max(0.06, h / 2 - stile);
+    const ring = plateWithHoles(w, h, [[-px, -py, px, py]], frameT, m, { bevel: inch(0.05) });
+    ring.position.z = frameT / 2;
+    g.add(ring);
+    // backer behind the opening
+    const back = box(px * 2 + inch(0.2), py * 2 + inch(0.2), inch(0.3), m, { r: inch(0.02), uv: true });
+    back.position.z = inch(0.15);
+    g.add(back);
+    // bevel sloping from the frame's inner edge down toward the field
+    g.add(stickingRing(-px, -py, px, py, frameT - inch(0.02), fieldT - inch(0.16), bevel, m));
+    // raised centre field
+    const fw = Math.max(0.05, (px - bevel) * 2), fh = Math.max(0.05, (py - bevel) * 2);
+    const field = box(fw, fh, fieldT - inch(0.3), m, { r: inch(0.04), uv: true });
+    field.position.z = (fieldT - inch(0.3)) / 2 + inch(0.28);
+    g.add(field);
+    g.userData.panelRect = [px * 2, py * 2];
     return g;
   }
 
@@ -2111,7 +2162,12 @@ export function makeKit(THREE, mat, tex) {
   function faceWithPull(w, h, o = {}) {
     const g = o.style === 'slab'
       ? slabDoorPanel(w, h, { material: o.material })
-      : shakerDoorPanel(w, h, { material: o.material, stileWidth: o.stileWidth });
+      : o.style === 'raised'
+        ? raisedDoorPanel(w, h, {
+            material: o.material, stileWidth: o.stileWidth,
+            bevelWidth: o.drawer ? inch(1.1) : undefined,
+          })
+        : shakerDoorPanel(w, h, { material: o.material, stileWidth: o.stileWidth });
     if (o.pulls && o.pulls !== 'none') {
       const isDrawer = !!o.drawer;
       const len = isDrawer ? Math.min(w * 0.42, inch(7)) : inch(5);
@@ -2152,7 +2208,7 @@ export function makeKit(THREE, mat, tex) {
     const cd = d - doorT;
 
     if (toe > 0) {
-      const tk = boxAt(-w / 2, 0, 0, w, toe, cd - CAB.toeD, P.black, { r: inch(0.03) });
+      const tk = boxAt(-w / 2, 0, 0, w, toe, cd - CAB.toeD, o.toeMaterial || P.black, { r: inch(0.03) });
       g.add(tk);
     }
     const carc = boxAt(-w / 2, toe, 0, w, h - toe, cd, m, { r: R_EASE, uv: true });
@@ -2255,17 +2311,19 @@ export function makeKit(THREE, mat, tex) {
     const g = G('bottom centre of the cabinet back, on the floor', [w, h, d]);
     const doorT = inch(0.75);
     const cd = d - doorT;
-    g.add(boxAt(-w / 2, 0, 0, w, toe, cd - CAB.toeD, P.black, { r: inch(0.03) }));
+    g.add(boxAt(-w / 2, 0, 0, w, toe, cd - CAB.toeD, o.toeMaterial || P.black, { r: inch(0.03) }));
     g.add(boxAt(-w / 2, toe, 0, w, h - toe, cd, m, { r: R_EASE, uv: true }));
     // split: lower doors to 7'0"-ish, upper doors above
     const splitY = o.split === undefined ? Math.min(h - inch(2), toe + ft(4, 4)) : o.split;
     const bands = splitY < h - inch(10) ? [[toe, splitY], [splitY, h]] : [[toe, h]];
-    for (const [ya, yb] of bands) {
+    for (let bi = 0; bi < bands.length; bi++) {
+      const [ya, yb] = bands[bi];
       const cols = frontRun(w, doors);
       for (let i = 0; i < cols.length; i++) {
         const [cx, cw] = cols[i];
         const f = faceWithPull(cw, (yb - ya) - 2 * REVEAL, {
           style, material: m, pulls, hinge: i === 0 ? 'left' : 'right',
+          pullAt: bands.length === 2 && bi === 1 ? 'bottom' : undefined,
         });
         f.position.set(cx, (ya + yb) / 2, cd);
         g.add(f);
@@ -2290,7 +2348,7 @@ export function makeKit(THREE, mat, tex) {
     const g = G('bottom centre of the island in plan, on the floor',
       [w + 2 * over, h + CAB.counterT, d]);
     const toe = CAB.toeH;
-    g.add(box(w - inch(6), toe, d - inch(6), P.black, { r: inch(0.03), at: [0, toe / 2, 0] }));
+    g.add(box(w - inch(6), toe, d - inch(6), o.toeMaterial || P.black, { r: inch(0.03), at: [0, toe / 2, 0] }));
     const body = box(w, h - toe, d, m, { r: R_EASE, uv: true });
     body.position.y = toe + (h - toe) / 2;
     g.add(body);
@@ -2405,8 +2463,9 @@ export function makeKit(THREE, mat, tex) {
     const h = o.h === undefined ? ft(3, 0) : o.h;
     const m = o.material || P.cabWhite;
     const g = G('bottom centre of the hood back, bottom of the apron', [w, h, d]);
-    const apron = inch(7.0);
-    const chimW = w * 0.42, chimD = d * 0.5;
+    const apron = o.apron === undefined ? inch(7.0) : o.apron;
+    const chimFrac = o.chimFrac === undefined ? 0.42 : o.chimFrac;
+    const chimW = w * chimFrac, chimD = d * 0.5;
 
     // apron band with a stepped bottom edge and a small crown
     const band = boxAt(-w / 2, 0, 0, w, apron, d, m, { r: R_PAINT, uv: true });
@@ -2424,7 +2483,7 @@ export function makeKit(THREE, mat, tex) {
       g.add(cor);
     }
     // tapered shroud
-    const taperH = Math.max(inch(6), (h - apron) * 0.45);
+    const taperH = o.taperH === undefined ? Math.max(inch(6), (h - apron) * 0.45) : o.taperH;
     const tb = taperBox(w - inch(1.0), d - inch(0.6), chimW, chimD, taperH, m, { bottom: false });
     tb.position.set(0, apron, d / 2 - inch(0.2));
     g.add(tb);
@@ -2489,6 +2548,63 @@ export function makeKit(THREE, mat, tex) {
     const g = G('bottom centre against the wall face', [w, h, t]);
     const s = boxAt(-w / 2, 0, 0, w, h, t, m, { r: inch(0.05), uv: true });
     g.add(s);
+    return g;
+  }
+
+  /**
+   * Electrical device in a screwless decora plate: duplex outlet, rocker
+   * switch bank, or a blank cover.  DETAILS.md G1: every device in the house
+   * is a white decora in a white plate (primary bath excepted).
+   * @anchor centre of the PLATE on the wall face (z = 0), projecting +Z.
+   * @param {object} [o] {kind:'outlet'|'switch'|'blank', gangs, horizontal,
+   *                      plateColor, deviceColor, tilt (radians, off-plumb)}
+   */
+  function decoraDevice(o = {}) {
+    const kind = o.kind || 'outlet';
+    const gangs = o.gangs === undefined ? 1 : o.gangs;
+    const plateColor = o.plateColor === undefined ? 0xf4f2ed : o.plateColor;
+    const deviceColor = o.deviceColor === undefined ? 0xf7f5f0 : o.deviceColor;
+    const pm = local('devicePlate' + plateColor.toString(16), null, {
+      color: plateColor, roughness: 0.32, metalness: 0.0,
+      clearcoat: 0.5, clearcoatRoughness: 0.2, envMapIntensity: 0.8,
+    });
+    const dm = local('deviceFace' + deviceColor.toString(16), null, {
+      color: deviceColor, roughness: 0.38, metalness: 0.0,
+      clearcoat: 0.35, clearcoatRoughness: 0.28, envMapIntensity: 0.75,
+    });
+    const pw = inch(2.75) + (gangs - 1) * inch(1.8125);
+    const ph = inch(4.5);
+    const g = G('centre of the plate on the wall face', [pw, ph, inch(0.6)]);
+    const plate = box(pw, ph, inch(0.22), pm, { r: inch(0.09), seg: 2 });
+    plate.position.z = inch(0.11);
+    g.add(plate);
+    for (let i = 0; i < gangs; i++) {
+      const cx = -((gangs - 1) * inch(1.8125)) / 2 + i * inch(1.8125);
+      if (kind === 'blank') continue;
+      if (kind === 'switch') {
+        const rocker = box(inch(1.18), inch(2.6), inch(0.16), dm, { r: inch(0.05), seg: 2 });
+        rocker.position.set(cx, 0, inch(0.28));
+        rocker.rotation.x = deg(3);
+        g.add(rocker);
+      } else {
+        // decora duplex: one rectangular face with two recessed receptacles
+        const face = box(inch(1.3), inch(3.3), inch(0.14), dm, { r: inch(0.06), seg: 2 });
+        face.position.set(cx, 0, inch(0.26));
+        g.add(face);
+        for (const sy of [-1, 1]) {
+          const rec = box(inch(1.02), inch(1.06), inch(0.06), dm, { r: inch(0.1), seg: 2 });
+          rec.position.set(cx, sy * inch(0.83), inch(0.34));
+          g.add(rec);
+          // slots read as two dark nicks at photo distance
+          for (const sx of [-1, 1]) {
+            const slot = box(inch(0.08), inch(0.3), inch(0.04), P.iron, { r: inch(0.01) });
+            slot.position.set(cx + sx * inch(0.28), sy * inch(0.83) + inch(0.08), inch(0.38));
+            g.add(slot);
+          }
+        }
+      }
+    }
+    if (o.tilt) g.rotation.z = o.tilt;
     return g;
   }
 
@@ -3611,9 +3727,9 @@ export function makeKit(THREE, mat, tex) {
       local('pendantShadeIn', null, { color: 0xf5f0e6, roughness: 0.5, side: THREE.BackSide }));
     inner.position.copy(cone.position);
     g.add(inner);
-    const bulb = ball(inch(1.8), P.bulb, 20);
+    const bulb = ball(inch(1.6), P.bulb, 20);
     bulb.castShadow = false;
-    bulb.position.y = cy - inch(2.0) - shadeH * 0.72;
+    bulb.position.y = cy - inch(2.0) - shadeH * 0.5;
     g.add(bulb);
     return g;
   }
@@ -3645,6 +3761,35 @@ export function makeKit(THREE, mat, tex) {
       sh.position.set(x, 0, inch(6.2));
       g.add(sh);
     }
+    return g;
+  }
+
+  /**
+   * Slim linear LED vanity bar: a metal channel on short stand-offs with a
+   * glowing diffuser on its underside — the fixture over both mirrors in
+   * `master_bedroom_bathroom_view_2` (brushed brass there) and, in black, in
+   * `bathroom_second_floor_1`.
+   * @anchor centre of the backplate on the WALL face (z = 0), bar horizontal.
+   */
+  function linearVanityBar(o = {}) {
+    const w = o.w === undefined ? ft(2, 0) : o.w;
+    const fin = finishMat(o.finish || 'brass');
+    const g = G('centre of the backplate on the wall face', [w, inch(3), inch(4)]);
+    const plate = box(inch(4.6), inch(1.1), inch(0.5), fin, { r: inch(0.12), seg: 2 });
+    plate.position.z = inch(0.25);
+    g.add(plate);
+    for (const s of [-1, 1]) {
+      const arm = cyl(inch(0.28), inch(0.28), inch(2.1), fin, 12);
+      arm.rotation.x = HALFPI;
+      arm.position.set(s * (w / 2 - inch(2.4)), inch(0.35), inch(1.3));
+      g.add(arm);
+    }
+    const body = box(w, inch(1.1), inch(1.05), fin, { r: inch(0.38), seg: 3 });
+    body.position.set(0, inch(0.5), inch(2.6));
+    g.add(body);
+    const lens = box(w - inch(0.8), inch(0.3), inch(0.75), P.bulb, { r: inch(0.09), cast: false });
+    lens.position.set(0, -inch(0.08), inch(2.6));
+    g.add(lens);
     return g;
   }
 
@@ -5884,10 +6029,11 @@ export function makeKit(THREE, mat, tex) {
     PROFILE, materials: P, uvScaleFor: uvs, group: G,
 
     plateWithHoles, ellipseRing, cavityBox, basinCavity, basin, flameAlpha,
+    decoraDevice,
 
     // millwork / trim
     baseboard, crownMolding, chairRail, doorCasing, windowCasing,
-    shakerDoorPanel, slabDoorPanel, pull,
+    shakerDoorPanel, slabDoorPanel, raisedDoorPanel, pull,
 
     // doors & windows
     doorLeaf, interiorDoor, bypassClosetDoors, frontDoor, plantationShutters,
@@ -5910,8 +6056,8 @@ export function makeKit(THREE, mat, tex) {
 
     // light fixtures
     recessedTrim, sputnikGlobeChandelier, goldDandelionBurstChandelier,
-    pendantBlackShadeBrassChain, vanityBar, flushMount, fluorescentTroffer,
-    skylightWell,
+    pendantBlackShadeBrassChain, vanityBar, linearVanityBar, flushMount,
+    fluorescentTroffer, skylightWell,
 
     // structure
     straightStair, returnStair, stairRailing, newelPost, turnedOakPost,

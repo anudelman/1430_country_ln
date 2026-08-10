@@ -88,7 +88,7 @@ export const LOADERS = {
   // 'fire-pit':        () => import('../rooms/fire-pit.js'),
   // ---- first ------------------------------------------------------------
   // 'foyer':           () => import('../rooms/foyer.js'),
-  // 'kitchen':         () => import('../rooms/kitchen.js'),
+  'kitchen': () => import('../rooms/kitchen.js'),
   // 'breakfast-nook':  () => import('../rooms/breakfast-nook.js'),
   // 'dining':          () => import('../rooms/dining.js'),
   // 'living':          () => import('../rooms/living.js'),
@@ -99,7 +99,7 @@ export const LOADERS = {
   // ---- second -----------------------------------------------------------
   // 'upper-hall':      () => import('../rooms/upper-hall.js'),
   // 'primary-bed':     () => import('../rooms/primary-bed.js'),
-  // 'primary-bath':    () => import('../rooms/primary-bath.js'),
+  'primary-bath': () => import('../rooms/primary-bath.js'),
   // 'sunroom':         () => import('../rooms/sunroom.js'),
   // 'bed-second':      () => import('../rooms/bed-second.js'),
   // 'bath-second':     () => import('../rooms/bath-second.js'),

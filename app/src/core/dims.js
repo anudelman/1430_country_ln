@@ -203,6 +203,7 @@ const S = {
   xPbaE: 26.5, //  13.583 + 12'11"
   xSunE: 26.375, //   1.625 + 24'9"
   xWcW: 23.5, //  26.5 - 3'0"
+  zWcN: 14.842, //  19.592 - 4'9" — the W.C. is at the SE corner of the bath
   xWicE: 27.5, //  13.583 + 13'11"
   xLinW: 26.875, //  upper-hall linen
   xBrNW: 27.25,
@@ -228,7 +229,7 @@ const S = {
   zPbdN: 5.842,
   zPbdS: 27.425, //   5.842 + 21'7"
   zPbaS: 19.592, //   5.842 + 13'9"
-  zWcS: 10.592, //   5.842 + 4'9"
+  zWcS: 10.592, //   (unused — the W.C. is at the SE corner; see zWcN below)
   zWicN: 19.967,
   zWicS: 27.467, //  19.967 + 7'6"
   zBrNS: 16.8, //   4.05 + 12'9"
@@ -620,13 +621,18 @@ export const ROOMS = {
     level: 'second',
     label: 'Primary Bath',
     size: [12.917, 13.75], // 12'11" x 13'9"
-    // The 3'0" x 4'9" water closet is carved out of the NE corner.
+    // The 3'0" x 4'9" water closet is carved out of the SE corner.
+    // CORRECTED (primary-bath, round 1): an earlier pass put the W.C. in the
+    // NE corner, but both `master_bedroom_bathroom_view_1.png` and the second
+    // floor plan show the corner glass shower at the NE (against the sunroom
+    // wall), the drop-in tub south of it along the east wall, and the toilet
+    // room with its six-panel door at the SOUTH end of the east side.
     poly: [
       [S.xPbaW, S.zPbdN],
-      [S.xWcW, S.zPbdN],
-      [S.xWcW, S.zWcS],
-      [S.xPbaE, S.zWcS],
-      [S.xPbaE, S.zPbaS],
+      [S.xPbaE, S.zPbdN],
+      [S.xPbaE, S.zWcN],
+      [S.xWcW, S.zWcN],
+      [S.xWcW, S.zPbaS],
       [S.xPbaW, S.zPbaS],
     ],
   },
@@ -635,7 +641,7 @@ export const ROOMS = {
     level: 'second',
     label: 'Bath',
     size: [3.0, 4.75], // 3'0" x 4'9"
-    rect: [S.xWcW, S.zPbdN, S.xPbaE, S.zWcS],
+    rect: [S.xWcW, S.zWcN, S.xPbaE, S.zPbaS],
   },
 
   sunroom: {
@@ -949,8 +955,12 @@ W('w2-sunroom-s', [S.xSunW, c(S.zSunS, S.zPbdN)], [S.xSunE, c(S.zSunS, S.zPbdN)]
 W('w2-builtin-e', [S.xBiE, S.zN0], [S.xBiE, S.zBiS], 'second', 0.2);
 W('w2-primary-e', [c(S.xPbdE, S.xPbaW), c(S.zSunS, S.zPbdN)], [c(S.xPbdE, S.xPbaW), c(S.zPbdS, S.zHallN)], 'second');
 W('w2-primarybath-s', [c(S.xPbdE, S.xPbaW), c(S.zPbaS, S.zWicN)], [S.xWicE, c(S.zPbaS, S.zWicN)], 'second', WALL.plumb);
-W('w2-wc-w', [S.xWcW, S.zPbdN], [S.xWcW, S.zWcS], 'second');
-W('w2-wc-s', [S.xWcW, S.zWcS + WALL.int / 2], [S.xPbaE, S.zWcS + WALL.int / 2], 'second');
+// W.C. at the SE corner of the bath (see primaryBath note above).
+W('w2-wc-w', [S.xWcW, S.zWcN], [S.xWcW, S.zPbaS], 'second');
+W('w2-wc-n', [S.xWcW, S.zWcN - WALL.int / 2], [S.xPbaE, S.zWcN - WALL.int / 2], 'second');
+// Closes the W.C.'s east side against the upper-linen / hall zone; without it
+// the open W.C. door shows the bare wall cavity from the bath camera.
+W('w2-wc-e', [S.xPbaE + WALL.int / 2, S.zWcN - WALL.int], [S.xPbaE + WALL.int / 2, S.zPbaS], 'second');
 W('w2-bedroom2-w', [c(S.xPbaE, S.xBrNW), S.zNE], [c(S.xPbaE, S.xBrNW), c(S.zBrNS, S.zHeN)], 'second');
 W('w2-bedroom2-s', [c(S.xPbaE, S.xBrNW), c(S.zBrNS, S.zHeN)], [S.xE, c(S.zBrNS, S.zHeN)], 'second');
 W('w2-wic-e', [c(S.xWicE, S.xHeW), c(S.zBrNS, S.zHeN)], [c(S.xWicE, S.xHeW), c(S.zWicS, S.zHallN)], 'second');
@@ -1104,8 +1114,20 @@ export const OPENINGS = [
   { wall: 'w-hall21-s', type: 'door', center: 25.0, w: ft(3, 0), h: DH, sill: 0, swing: 'bifold', note: 'coat closet' },
   { wall: 'w-vestibule-e', type: 'opening', center: 1.8, w: ft(3, 6), h: ft(7, 0), sill: 0, swing: 'cased' },
   { wall: 'w-bath-n', type: 'door', center: 2.6, w: ft(2, 6), h: DH, sill: 0, swing: 'left-in', note: 'bath lobby to bath' },
-  { wall: 'w-kitchen-s', type: 'opening', center: 4.0, w: ft(6, 0), h: ft(7, 6), sill: 0, swing: 'cased', note: 'kitchen to hall' },
-  { wall: 'w-kitchen-e', type: 'opening', center: 10.5, w: ft(7, 0), h: ft(7, 6), sill: 0, swing: 'cased', note: 'kitchen to centre hall' },
+  // CORRECTED (kitchen, round 1): the kitchen's SOUTH wall is SOLID.  The
+  // floor plan draws the counter run (sink + range) against it for its whole
+  // length, and kitchen_view_1/3 show continuous cabinets and a full-height
+  // slab backsplash there with no gap.  The old 6'-0" cased opening at
+  // center 4.0 put a hole exactly where the sink run stands.  The kitchen is
+  // entered from the centre hall (east) and is open to the breakfast nook
+  // (north) — there is no south opening.
+  //
+  // The EAST opening is likewise smaller and further north than first
+  // guessed: the floor plan shows the east counter return running from the
+  // angled SE corner up to about 4.6 ft short of the wall's north end, with
+  // a ~3 ft passage to the centre hall beyond it (kitchen_view_2 looks
+  // through it at the hall and the foyer door).
+  { wall: 'w-kitchen-e', type: 'opening', center: 7.3, w: ft(3, 0), h: ft(7, 6), sill: 0, swing: 'cased', note: 'kitchen to centre hall' },
   { wall: 'w-dining-s', type: 'opening', center: 6.9, w: ft(6, 0), h: ft(7, 6), sill: 0, swing: 'cased', note: 'dining room to centre hall' },
   { wall: 'w-nook-e', type: 'opening', center: 6.0, w: ft(5, 0), h: ft(7, 6), sill: 0, swing: 'cased', note: 'breakfast nook to dining room' },
   { wall: 'w-living-w', type: 'opening', center: 18.0, w: ft(8, 0), h: ft(8, 0), sill: 0, swing: 'cased', note: 'centre hall to living room' },
@@ -1161,10 +1183,17 @@ export const OPENINGS = [
 
   /* ---------------- second floor, interior --------------------------- */
   { wall: 'w2-sunroom-s', type: 'opening', center: 5.0, w: ft(8, 0), h: ft(7, 0), sill: 0, swing: 'cased', note: 'primary bedroom to sunroom' },
-  { wall: 'w2-sunroom-s', type: 'opening', center: 18.0, w: ft(6, 0), h: ft(7, 0), sill: 0, swing: 'cased', note: 'primary bath to sunroom' },
-  { wall: 'w2-primary-e', type: 'door', center: 10.0, w: ft(2, 8), h: DH, sill: 0, swing: 'left-in', note: 'primary bedroom to bath' },
+  // CORRECTED (primary-bath, round 1): the bath connects to the sunroom
+  // through a white vinyl 2-panel SLIDER with a black handle (DETAILS
+  // `primary-bath` §B, both bath photos), not a cased opening.  Its position
+  // was fitted photogrammetrically off master_bedroom_bathroom_view_1: the
+  // unit spans x 16.2 .. 22.2 with painted wall each side.
+  { wall: 'w2-sunroom-s', type: 'door', center: 17.575, w: ft(6, 0), h: ft(6, 8), sill: 0, swing: 'slide', note: 'primary bath to sunroom — white 2-panel slider, black handle' },
+  // Door sits at the SOUTH end of the shared wall (floor plan: the vanity run
+  // occupies the north 10 ft of the bath side).
+  { wall: 'w2-primary-e', type: 'door', center: 12.2, w: ft(2, 8), h: DH, sill: 0, swing: 'left-in', note: 'primary bedroom to bath' },
   { wall: 'w2-primarybath-s', type: 'door', center: 4.0, w: ft(2, 8), h: DH, sill: 0, swing: 'right-in', note: 'primary bath to W.I.C.' },
-  { wall: 'w2-wc-w', type: 'door', center: 2.4, w: ft(2, 4), h: DH, sill: 0, swing: 'left-in', note: 'water closet' },
+  { wall: 'w2-wc-w', type: 'door', center: 2.9, w: ft(2, 4), h: DH, sill: 0, swing: 'right-in', note: 'water closet — white six-panel, black lever, opens out into the bath' },
   { wall: 'w2-wic-e', type: 'door', center: 3.8, w: ft(2, 8), h: DH, sill: 0, swing: 'right-in', note: 'W.I.C. to upper hall' },
   { wall: 'w2-bedroom2-s', type: 'door', center: 8.0, w: ft(2, 8), h: DH, sill: 0, swing: 'left-in', note: 'NE bedroom' },
   { wall: 'w2-hall-n', type: 'door', center: 4.0, w: ft(2, 8), h: DH, sill: 0, swing: 'right-in', note: 'hall to primary bedroom' },
@@ -1259,7 +1288,9 @@ export const SKYLIGHTS = [
     id: 'sky-primary-bath',
     level: 'second',
     room: 'primaryBath',
-    plan: [17.6, 8.6, 22.4, 13.4],
+    // Nudged east/north to sit over the tub aisle the way both bath photos
+    // show it (its SE corner projects to ~photo (870, 245) in view_1).
+    plan: [18.2, 8.2, 23.0, 13.0],
     ceilY: CEIL_Y.second,
     roofY: 21.4,
     wellSplay: 1.1,
