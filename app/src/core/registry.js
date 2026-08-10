@@ -83,8 +83,8 @@ export const LOADERS = {
   // ---- exterior ---------------------------------------------------------
   'exterior-front': () => import('../rooms/exterior-front.js'),
   'exterior-entry': () => import('../rooms/exterior-entry.js'),
-  // 'exterior-rear':   () => import('../rooms/exterior-rear.js'),
-  // 'deck-patio':      () => import('../rooms/deck-patio.js'),
+  'exterior-rear': () => import('../rooms/exterior-rear.js'),
+  'deck-patio': () => import('../rooms/deck-patio.js'),
   // 'fire-pit':        () => import('../rooms/fire-pit.js'),
   // ---- first ------------------------------------------------------------
   // 'foyer':           () => import('../rooms/foyer.js'),

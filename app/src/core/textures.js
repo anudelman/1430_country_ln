@@ -1855,6 +1855,67 @@ function genAsphaltShingle(size) {
   return s;
 }
 
+/* ------------------------------------------------------------ buff flagstone */
+/**
+ * Pale buff/cream irregular flagstone — the BACK-yard patio, which is a
+ * completely different stone from the blue-grey front walk.
+ *
+ * Measured off `backyard_patio_1.png`: the open flags read 185-218 sRGB with
+ * R > G > B by 8-12 levels (218,215,207 in the sun; 168,162,151 in shade),
+ * i.e. a warm limestone at ~0.62 albedo. Rendering that patio in `bluestone`
+ * (tones around #666a6f, half the reflectance and cool) put a slab of wet
+ * slate where the photograph has a bright cream terrace — the single biggest
+ * value error in the frame.
+ *
+ * This map is tiled UNDER separately-modelled slabs (kit.crazyPaving), so its
+ * own cell outlines stay faint: they exist only to keep the surface from
+ * reading as one continuous sheet of stone.
+ */
+function genFlagstoneBuff(size) {
+  const TU = 7.0, TV = 7.0;
+  const s = blank(size, [TU, TV]);
+  const jointC = hexRGB('#b3aa9a');
+  const tones = [
+    hexRGB('#d9d2c3'), hexRGB('#cfc7b6'), hexRGB('#e2dccd'), hexRGB('#c6bfae'),
+    hexRGB('#d3ccbd'), hexRGB('#dcd6c6'), hexRGB('#c9c2b3'),
+  ];
+  for (let y = 0; y < size; y++) {
+    const v01 = (y + 0.5) / size;
+    for (let x = 0; x < size; x++) {
+      const u01 = (x + 0.5) / size;
+      const i = y * size + x;
+      const w = warpT(u01, v01, 3, 3, 0.12, 2211);
+      const cell = worleyT(w[0], w[1], 3, 3, 2211, 1);
+      const border = cell.f2 - cell.f1;
+      const jw = 0.005;
+      if (border < jw) {
+        const k = smoothstep(0, jw, border);
+        const n = fbmT(u01, v01, 200, 200, 2, 4);
+        setPx(s, i, scaleRGB(jointC, 0.82 + n * 0.18), 0.08 + k * 0.32,
+          clamp01(0.95 + n * 0.04));
+        continue;
+      }
+      const tk = cell.id;
+      let c = tones[tk % tones.length];
+      c = scaleRGB(c, 0.955 + ((tk >>> 7) & 255) / 255 * 0.09);
+      // sawn-and-weathered face: shallow ripple, fine pitting, faint rust
+      const cleft = fbmT(u01, v01, 18, 13, 4, 5 + (tk & 15));
+      const fine = fbmT(u01, v01, 170, 140, 2, 6);
+      c = scaleRGB(c, 1 + cleft * 0.075 + fine * 0.035);
+      c = mixRGB(c, [0.60, 0.53, 0.42], smoothstep(0.66, 1.0, fbmT(u01, v01, 5, 5, 3, 7)) * 0.10);
+      // grey lichen blooms
+      c = mixRGB(c, [0.55, 0.57, 0.52], smoothstep(0.74, 1.0, fbmT(u01, v01, 11, 11, 3, 21)) * 0.16);
+      const edge = smoothstep(jw, jw + 0.026, border);
+      const h = (0.55 + cleft * 0.28 + fine * 0.14) * (0.5 + 0.5 * edge);
+      setPx(s, i, c, clamp01(h), clamp01(0.80 + cleft * 0.08 + fine * 0.05));
+    }
+  }
+  s.reliefFt = 0.016;
+  s.aoStrength = 1.7;
+  s.aoRadius = 0.02;
+  return s;
+}
+
 /* ---------------------------------------------------------------- bluestone */
 /** Irregular blue-gray cleft flagstone with sand joints. */
 function genBluestone(size) {
@@ -2590,6 +2651,7 @@ const REG = {
   marbleLookTile: { hero: true, gen: genMarbleLookTile, scaleFeet: [4, 4], note: '1st-floor bath 12x12 beige marble-look porcelain.' },
   mosaicAccent: { hero: false, gen: genMosaicAccent, scaleFeet: [0.5, 0.5], note: '1" square blended mosaic accent band.' },
   bluestone: { hero: false, gen: genBluestone, scaleFeet: [6, 6], note: 'Irregular blue-gray cleft flagstone.' },
+  flagstoneBuff: { hero: false, gen: genFlagstoneBuff, scaleFeet: [7, 7], note: 'Pale buff/cream irregular flagstone — the rear patio (185-218 sRGB, warm). NOT the blue-grey front walk.' },
   stackedLimestone: { hero: false, gen: genStackedLimestone, scaleFeet: [4, 3.2 / 12 * 12], note: 'Buff dry-stack ledgestone, 3.2" courses.' },
   concreteDriveway: { hero: false, gen: genConcreteDriveway, scaleFeet: [6, 6], note: 'Broom-finished gray concrete.' },
 

@@ -1442,7 +1442,13 @@ function buildExterior(ctx, handle) {
     { poly: SITE.mulchBeds[1].poly, y: SITE.mulchBeds[1].y, mat: 'mulchBed', name: 'site:bed-front-east' },
     { poly: SITE.mulchBeds[3].poly, y: SITE.mulchBeds[3].y, mat: 'mulchBed', name: 'site:bed-rear-north' },
     { poly: MASSING.deck.main.poly, y: MASSING.deck.main.topY, mat: 'compositeDeck', name: 'site:deck-main' },
-    { poly: MASSING.deck.lower.poly, y: MASSING.deck.lower.topY, mat: 'compositeDeck', name: 'site:deck-lower' },
+    // MASSING.deck's schema is owned by the `deck-patio` piece and changes
+    // under us; `deck.lower` has already been folded into `deck.main` once.
+    // Reading it unguarded threw before a single mesh was built and every
+    // exterior render came out pure black.
+    ...(MASSING.deck.lower
+      ? [{ poly: MASSING.deck.lower.poly, y: MASSING.deck.lower.topY, mat: 'compositeDeck', name: 'site:deck-lower' }]
+      : []),
   ];
   for (const h of hard) {
     const material = M(ctx, h.mat, 'concreteDriveway');

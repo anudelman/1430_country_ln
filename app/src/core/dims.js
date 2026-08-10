@@ -1027,7 +1027,7 @@ export const OPENINGS = [
   // Back-projected off backyard_straight_on_view_of_house: a TALL NARROW light
   // hard against the dining-bay corner and a wide 2-lite window further west.
   { wall: 'ext-first-2', type: 'window', center: 2.9, w: 2.6, h: 5.6, sill: 0.9, note: 'living room rear, tall narrow' },
-  { wall: 'ext-first-2', type: 'window', center: 17.2, w: 6.6, h: 3.6, sill: 2.9, note: 'living room rear' },
+  { wall: 'ext-first-2', type: 'window', center: 15.9, w: 6.6, h: 3.6, sill: 2.9, note: 'living room rear' },
 
   { wall: 'ext-first-3', type: 'window', center: 8.0, w: 3.0, h: 4.5, sill: 2.5, note: 'living room east' },
   { wall: 'ext-first-3', type: 'window', center: 14.5, w: 3.0, h: 4.5, sill: 2.5, note: 'living room east' },
@@ -1543,12 +1543,16 @@ export const MASSING = {
       type: 'hip',
       over: 'mainTwoStory',
       poly: FOOTPRINTS.second,
-      eaveY: 18.5,
-      ridgeY: 24.0,
+      // MEASURED off backyard_straight_on_view_of_house: the fascia band runs
+      // photo rows 281-294, i.e. Y 17.4 down to 16.6 on the 15.85 px/ft rear
+      // wall scale. Eave 18.5 / ridge 24.0 stood the whole roof 1.1 ft proud
+      // of where the photographs put it.
+      eaveY: 17.4,
+      ridgeY: 22.7,
       pitch: 4.0,
       ridgeDir: 'ew',
-      overhang: 2.0,
-      fasciaH: 1.5,
+      overhang: 1.1,
+      fasciaH: 0.9,
       rakeH: 1.5,
       material: 'asphaltCharcoal',
       note: 'Low hip with a deep flat fascia band — the dominant 1970s-modern move.',
@@ -1632,9 +1636,13 @@ export const MASSING = {
   chimney: {
     // Serves the living-room gas fireplace. In the rear photo (looking north
     // to south, so screen-left = +X) it reads on the left. Matches.
-    plan: [F.xLivE - 4.6, F.zLivN + 0.2, F.xLivE - 0.4, F.zLivN + 3.6],
+    // Back-projected off backyard_straight_on_view_of_house: the siding-clad
+    // chase reads 73 px wide at photo x 191-264 (5.1 ft on the z = 5.2 plane)
+    // and its cap tops out at photo row 345, i.e. Y 14.2 — one foot proud of
+    // the living-wing ridge (13.2), not the 16.4 assumed here before.
+    plan: [F.xLivE - 4.4, F.zLivN + 0.2, F.xLivE + 0.5, F.zLivN + 3.6],
     baseY: GRADE.sides,
-    topY: 16.4,
+    topY: 14.4,
     capH: 0.5,
     material: 'sidingGray',
   },
@@ -1653,138 +1661,203 @@ export const MASSING = {
   },
 
   /* ---- rear deck / patio / planter / fire pit ----------------------- */
-  //  Read from backyard_1, backyard_patio_1/2, backyard_fire_pit_1..3 and
-  //  backyard_straight_on_view_of_house.  Sizes are estimates scaled off the
-  //  deck boards (5-1/2" faces) and the 6'-8" rear door.
+  //  SOLVED off backyard_patio_1.png (the deck's own hero frame), not scaled
+  //  by eye.  Method, so the next agent can check it:
+  //
+  //  * The deck-board seams are a pencil of parallel lines; their spacing along
+  //    a scanline is exactly proportional to (v - 507), which fixes the HORIZON
+  //    at row 507 of the 1022-row frame (shift 0) and their vanishing point at
+  //    u = 1542.  With the boards running E-W (confirmed on the deck surface in
+  //    backyard_straight_on_view_of_house, where the seams are horizontal), the
+  //    camera therefore looks 45.8 deg EAST OF NORTH.
+  //  * The seam pitch is a known 5-3/4"; combined with the bench leg (top 802,
+  //    foot 929, a 17-1/2" seat) that solves BOTH unknowns at once:
+  //        camera height above the deck  h = 4.55 ft
+  //        focal length                  f = 838 px  (fovV 62.7 deg)
+  //    Cross-check: the railing post then measures 5.6" across — a 5-1/2"
+  //    composite post sleeve — and the river cobbles 8".
+  //  * Back-projecting the deck edge with those numbers gives a north edge
+  //    13.5-17.9 ft from a camera standing 1.7 ft off the rear wall, i.e. the
+  //    deck is ~19 ft deep at its bay and ~39 ft wide.  It is a BIG deck; the
+  //    old 12'-2" rectangle could not produce the photograph's geometry.
   deck: {
     id: 'deck',
-    label: 'Rear deck — two levels',
-    material: 'deckGrayStain',
+    label: 'Rear deck — one level, faceted bay, tree notch',
+    material: 'compositeDeck',
     boardW: inch(5.5),
     boardGap: inch(0.25),
-    boardDir: 'ew', // parallel to the house wall
-    screws: { pairsPerJoist: 2, joistSpacing: inch(16), rustStain: 0.15 },
-    // Main deck, tight to the rear wall.
+    boardDir: 'ew', // parallel to the house wall — MEASURED, not assumed
+    // Composite decking with hidden fasteners: there are NO screw heads in the
+    // field of the boards at 4x zoom in backyard_patio_1.  The only visible
+    // fasteners on the whole deck are the pairs in the bench aprons.
+    screws: { field: false, benchPairsPerLeg: 2 },
     main: {
       topY: -0.5,
+      // Clockwise from the house's west end.  The north edge is faceted, bows
+      // out to Z -19.7 in the middle, and RETREATS around the mature maple at
+      // [5.1, -20.5] (the tree notch, with its mulch collar at patio level).
       poly: [
-        [7.5, -11.5],
-        [30.5, -11.5],
-        [30.5, 0.0],
-        [7.5, 0.0],
+        [-18.0, 0.0],
+        [-18.0, -11.5],
+        [-12.5, -14.6],
+        [-4.9, -15.3],
+        [-2.5, -17.2],
+        [0.6, -19.6],
+        [2.6, -19.65],
+        [2.75, -18.9],
+        [3.6, -18.25],
+        [5.1, -18.0],
+        [6.6, -18.25],
+        [7.45, -18.9],
+        [7.6, -19.65],
+        [8.7, -16.8],
+        [11.2, -15.0],
+        [11.4, -16.1],
+        [14.2, -16.7],
+        [14.4, -15.6],
+        [20.3, -17.4],
+        [21.6, -11.3],
+        [20.5, -4.2],
+        [20.5, 0.0],
       ],
-      railing: { system: 'blackAluminumPicket', h: ft(3, 0), sides: ['east'] },
-    },
-    // Lower octagonal / angled platform, ~10" below the main deck.
-    lower: {
-      topY: -0.5 - inch(10),
-      poly: [
-        [2.0, -11.5],
-        [7.5, -11.5],
-        [7.5, -16.6],
-        [11.0, -19.4],
-        [18.0, -19.4],
-        [21.5, -16.6],
-        [21.5, -11.5],
-        [2.0, -11.5],
+      railing: [
+        { system: 'grayCompositePicket', h: ft(3, 2), path: [[20.5, -6.2], [20.5, 0.2]] },
+        { system: 'blackAluminumPicket', h: ft(3, 0), path: [[-18.0, -11.5], [-18.0, 0.2]] },
       ],
-      railing: { system: 'grayWood2x4Cap', h: ft(3, 0), balusterW: inch(1.5) },
     },
-    step: { line: [[7.5, -11.5], [21.5, -11.5]], riserH: inch(10), treadW: 1.1, bullnose: true },
-    skirt: { h: 0.85, material: 'latticeGrayDiagonal', lath: inch(1), frame: inch(3.5) },
+    // Single 8-1/2" step down to the flagstone, let into the north edge east
+    // of the tree.  (The old "lower octagonal platform" was a mis-read of this
+    // step plus the bench line.)
+    step: { line: [[11.4, -16.1], [14.2, -16.7]], riserH: 0.70, treadW: 1.15, bullnose: true },
+    skirt: { h: 0.70, material: 'latticeGrayDiagonal', lath: inch(1), frame: inch(3.5) },
     bench: {
-      // backless built-in along the outer edge of the lower platform
-      segs: [
-        [
-          [7.5, -16.6],
-          [11.0, -19.4],
-        ],
-        [
-          [11.0, -19.4],
-          [18.0, -19.4],
-        ],
-      ],
-      seatY: -0.5 - inch(10) + inch(17),
-      seatW: 1.25,
+      // Backless built-in, TWO 5-1/2" seat boards (11-1/4" total) at 17-1/2",
+      // mitred at every change of direction, outer legs flush with the deck
+      // edge — which is why the photograph cuts their feet off exactly at it.
+      seatY: -0.5 + inch(17.5),
+      seatW: 2 * inch(5.5) + inch(0.25),
       backH: 0,
-      legStyle: 'angledPlank',
+      legStyle: 'plankPair',
+      segs: [
+        [[-4.7, -14.8], [-2.4, -16.7], [0.5, -19.0], [7.8, -19.05], [8.9, -17.0]],
+        [[15.4, -15.9], [17.8, -16.6], [20.0, -17.3]],
+      ],
     },
     treeCutout: {
-      // deck cut-out around a mature trunk with a mulch collar
-      center: [15.0, -6.0],
-      r: 1.9,
-      mulchR: 1.9,
-      note: 'Distinctive, must-build detail (backyard_patio_1/2).',
+      // The deck retreats around a 2'-8" multi-stem maple; the collar inside
+      // the notch is black mulch at patio level, not decking.
+      center: [5.1, -20.5],
+      r: 2.2,
+      mulchR: 3.4,
+      note: 'Distinctive, must-build detail (backyard_patio_1/2, backyard_fire_pit_2).',
     },
   },
 
   patio: {
     id: 'patio',
-    label: 'Irregular flagstone patio',
-    material: 'bluestoneIrregular',
-    topY: -1.35,
+    label: 'Irregular buff-flagstone patio',
+    // NOT bluestone.  Measured 185-218 sRGB, warm (R-B +11) — a pale buff
+    // limestone.  The blue-grey cleft stone is the FRONT walk only.
+    material: 'flagstoneBuff',
+    // 1.5" proud of the turf (SITE.lot.grassY = -1.15): the lawn runs UP to the
+    // stone, never over it.
+    topY: -1.02,
+    // Wraps the deck's north and east edges and opens out into the fire-pit
+    // terrace at the north-west.  Slabs that fall under the deck are dropped
+    // by the builder, so this polygon may overlap the deck freely.
     poly: [
-      [12.0, -24.0],
-      [41.5, -24.0],
-      [44.0, -14.0],
-      [42.0, -1.0],
-      [30.5, -1.0],
-      [30.5, -13.0],
-      [17.5, -14.6],
-      [12.0, -18.0],
+      [-12.0, -13.0],
+      [-10.5, -18.5],
+      [-7.0, -23.0],
+      [-2.0, -25.8],
+      [4.0, -26.4],
+      [9.0, -24.4],
+      [11.5, -21.4],
+      [15.0, -20.4],
+      [21.0, -21.6],
+      [24.2, -18.0],
+      [24.6, -10.0],
+      [24.0, -3.0],
+      [19.0, -2.0],
+      [-6.0, -11.0],
     ],
     jointGrass: true,
   },
 
   planterWall: {
     id: 'planterWall',
-    label: 'Raised stacked-limestone planter / seat wall',
-    material: 'limestoneStacked',
-    // Faceted arc enclosing the raised fire-pit terrace, east of the deck.
-    // `path` is the OUTER face; the wall is 1'-5" thick with a 2" stone cap.
+    label: 'Raised stacked-limestone planter wall (retains the mulch bed)',
+    material: 'stackedLimestone',
+    // Back-projected off backyard_patio_1 at three points: the wall's south
+    // face runs ENE at Z ~ -25, 1'-5" tall, and it retains a raised black-mulch
+    // bed BEHIND it (the terrace side is the flagstone).  `path` is the wall's
+    // centreline.
     path: [
-      [22.5, -18.4],
-      [26.5, -21.6],
-      [32.0, -22.6],
-      [37.0, -21.4],
-      [40.4, -18.2],
-      [41.4, -14.2],
+      [-6.5, -22.4],
+      [-3.4, -24.4],
+      [0.3, -25.4],
+      [4.5, -25.6],
+      [8.0, -24.6],
+      [10.5, -22.6],
     ],
-    thickness: 1.4,
-    baseY: -1.35,
-    topY: 0.55,
-    capT: inch(2),
+    thickness: 1.35,
+    baseY: -1.05,
+    topY: 0.20,
+    capT: inch(2.5),
     capOverhang: inch(1.5),
-    fillTopY: 0.35, // raised terrace inside the wall
-    courseH: inch(3.5),
+    fillTopY: 0.02, // the mulch behind sits ~2" below the cap
+    courseH: inch(3.2),
   },
 
   firePit: {
     id: 'firePit',
     label: 'Fire pit',
-    center: [31.6, -17.6],
-    baseY: 0.35,
-    bowlOuterR: 1.9,
-    bowlInnerR: 1.5,
-    bowlH: 0.85,
-    material: 'steelBlack',
-    screen: { r: 1.75, h: 0.95, material: 'meshBlack' },
+    // On the flagstone, 3 ft in front of the planter wall — it reads at photo
+    // (355, 740) in backyard_patio_1, which is 19 ft from that camera.
+    center: [1.6, -22.0],
+    baseY: -1.02,
+    bowlOuterR: 2.0,
+    bowlInnerR: 1.45,
+    bowlH: 1.35,
+    material: 'stackedLimestone',
+    screen: { r: 1.65, h: 1.15, material: 'meshBlack' },
     surroundR: 4.6,
-    note: 'Round steel bowl with a mesh spark screen, on the raised terrace.',
+    note: 'Stone-clad ring, black steel dome spark screen, LIT in every frame.',
   },
 
   riverRockEdge: {
+    // Single course of 6-10" rounded cobbles: it edges EVERY mulch bed in this
+    // yard. Traced off backyard_patio_1 (the long sweeping line across the
+    // middle distance) and backyard_mulch_stone_steps.
     material: 'riverCobble',
-    stoneR: 0.42,
+    stoneR: 0.40,
     topY: -1.05,
     paths: [
+      // the big rear bed, lawn side
       [
-        [-3.0, -30.0],
-        [8.0, -27.0],
-        [18.0, -25.2],
-        [30.0, -25.6],
-        [42.0, -25.0],
+        [-16.0, -34.5],
+        [-1.6, -33.2],
+        [6.7, -31.7],
+        [13.9, -29.9],
+        [22.0, -26.4],
+        [31.8, -22.0],
+        [40.0, -20.4],
         [50.0, -21.0],
+      ],
+      // the bed east of the deck, against the flagstone
+      [
+        [22.6, -19.6],
+        [23.6, -14.0],
+        [25.0, -6.6],
+        [25.4, -1.0],
+      ],
+      // the raised planter's own lawn-side toe
+      [
+        [-11.0, -25.0],
+        [-6.0, -28.6],
+        [0.0, -30.2],
+        [7.0, -29.6],
+        [11.6, -26.6],
       ],
     ],
   },
@@ -1977,16 +2050,35 @@ export const SITE = {
     },
     { id: 'front-pine', at: [-13.0, 52.0], trunkR: 0.95, canopyR: 13.0, crownBaseY: 9.0, crownTopY: 46.0, species: 'pine' },
     { id: 'front-maple-e', at: [70.0, 62.0], trunkR: 0.5, canopyR: 7.5, crownBaseY: 6.0, crownTopY: 20.0, species: 'maple' },
-    /* --- the canopy that closes the sky BEHIND the roof ---------------- */
-    { id: 'bg-poplar-c', at: [28.0, -10.0], trunkR: 0.9, canopyR: 19.0, crownBaseY: 10.0, crownTopY: 50.0, species: 'poplar' },
-    { id: 'bg-poplar-e', at: [62.0, -18.0], trunkR: 0.9, canopyR: 21.0, crownBaseY: 10.0, crownTopY: 54.0, species: 'poplar' },
-    { id: 'bg-maple-w', at: [-2.0, -20.0], trunkR: 0.85, canopyR: 19.0, crownBaseY: 9.0, crownTopY: 46.0, species: 'maple' },
+    /* --- the canopy that closes the sky BEHIND the roof ----------------
+     * "Behind the roof" is a statement about the FRONT camera only, and the
+     * three of these used to sit at z -10, -18 and -20 — i.e. squarely in the
+     * BACK YARD, 35 ft in front of the rear camera, where their 38 ft crowns
+     * blanketed the entire sky above 7 degrees and hid the whole second storey
+     * and roof of backyard_straight_on_view_of_house. Parked between the house
+     * and the street instead, they still close the sky from z = 95 and are
+     * completely occluded by the house from z = -44. */
+    { id: 'bg-poplar-c', at: [24.0, 30.0], trunkR: 0.9, canopyR: 19.0, crownBaseY: 10.0, crownTopY: 50.0, species: 'poplar' },
+    { id: 'bg-poplar-e', at: [66.0, 22.0], trunkR: 0.9, canopyR: 21.0, crownBaseY: 10.0, crownTopY: 54.0, species: 'poplar' },
+    { id: 'bg-maple-w', at: [-14.0, 26.0], trunkR: 0.85, canopyR: 19.0, crownBaseY: 9.0, crownTopY: 46.0, species: 'maple' },
     { id: 'bg-maple-ne', at: [96.0, 2.0], trunkR: 0.8, canopyR: 20.0, crownBaseY: 9.0, crownTopY: 44.0, species: 'maple' },
     { id: 'bg-maple-far-e', at: [112.0, 40.0], trunkR: 0.7, canopyR: 17.0, crownBaseY: 8.0, crownTopY: 40.0, species: 'maple' },
     { id: 'bg-maple-far-w', at: [-34.0, -6.0], trunkR: 0.8, canopyR: 18.0, crownBaseY: 9.0, crownTopY: 44.0, species: 'maple' },
-    { id: 'rear-maple-w', at: [-8.0, -34.0], trunkR: 0.85, canopyR: 17.0, crownBaseY: 9.0, crownTopY: 44.0, species: 'maple' },
-    { id: 'rear-maple-c', at: [20.0, -46.0], trunkR: 0.75, canopyR: 16.0, crownBaseY: 10.0, crownTopY: 42.0, species: 'maple' },
-    { id: 'rear-maple-e', at: [48.0, -30.0], trunkR: 0.8, canopyR: 16.0, crownBaseY: 9.0, crownTopY: 40.0, species: 'maple' },
+    /* The two trunks that frame backyard_straight_on_view_of_house. SOLVED by
+     * back-projection, not placed by eye: the left (east) clump's stems reach
+     * the mulch at photo (530, 815), which with the 5.3 ft eye and f = 707 px
+     * puts it 13.4 ft from the lens at X 29.1, Z -31.2; the right (west) trunk
+     * meets grade at photo (1292, 700) -> X 9.2, Z -24.4. They own the top
+     * third of the frame because they are CLOSE, not because they are huge —
+     * and the old `rear-maple-c` at [20, -46] was two feet from the camera
+     * station, which filled the whole sky with one solid canopy. */
+    { id: 'rear-maple-w', at: [-9.0, -30.0], trunkR: 0.75, canopyR: 15.0, crownBaseY: 12.0, crownTopY: 40.0, species: 'maple' },
+    { id: 'rear-maple-frame-e', at: [32.4, -31.2], trunkR: 0.42, canopyR: 13.0, crownBaseY: 20.0, crownTopY: 44.0, species: 'maple', stems: 5, lean: 0.20, note: 'LEFT framing clump, multi-stem' },
+    // The right-hand trunk is a MONSTER: 83 px across at photo (1317, 654),
+    // which at 24 ft is 2'-10" in diameter. It grows out of a mulch collar
+    // let into the flagstone right at the deck edge and forks at ~14 ft.
+    { id: 'rear-maple-frame-w', at: [5.1, -20.5], trunkR: 1.15, canopyR: 13.0, crownBaseY: 21.0, crownTopY: 44.0, species: 'maple', stems: 1, lean: 0.05, note: 'RIGHT framing trunk' },
+    { id: 'rear-maple-e', at: [52.0, -26.0], trunkR: 0.8, canopyR: 16.0, crownBaseY: 11.0, crownTopY: 40.0, species: 'maple' },
     { id: 'rear-pine', at: [-20.0, -20.0], trunkR: 1.0, canopyR: 13.0, crownBaseY: 6.0, crownTopY: 48.0, species: 'pine' },
     { id: 'rear-pine-b', at: [-18.0, -60.0], trunkR: 0.9, canopyR: 12.0, crownBaseY: 6.0, crownTopY: 46.0, species: 'pine' },
   ],
@@ -2037,6 +2129,25 @@ export const SITE = {
       eaveY: 10.0,
       ridgeY: 19.0,
       color: '#a89d8c',
+    },
+    {
+      // RED BRICK with a tan gable — the house that fills the right edge of
+      // backyard_straight_on_view_of_house just past our west corner. Eave
+      // back-projects to Y 8.6, ridge to Y 15.6.
+      id: 'nbr-west-rear',
+      poly: [
+        [-30.0, -2.0],
+        [-8.0, -2.0],
+        [-8.0, 26.0],
+        [-30.0, 26.0],
+      ],
+      eaveY: 8.6,
+      ridgeY: 15.6,
+      ridgeDir: 'ns',
+      color: '#9d6a58',
+      roofColor: '#5a5b5c',
+      rearOnly: true,
+      note: 'Only exterior-rear builds this one — it is behind the camera in every front photo.',
     },
   ],
 

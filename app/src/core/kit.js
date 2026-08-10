@@ -4088,6 +4088,424 @@ export function makeKit(THREE, mat, tex) {
     return g;
   }
 
+  /* ---------------------------------------------------------------- */
+  /* 2.14b  polygonal decking, benches, irregular paving                */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * Where a plan polygon crosses the line z = zc, as sorted [x0,x1] spans.
+   * Standard even-odd scanline; handles concave outlines (a tree notch) and
+   * multiple spans on one line.
+   *
+   * @param {Array<[number,number]>} poly  plan points [x, z], implicitly closed
+   * @param {number} zc
+   * @returns {Array<[number,number]>}
+   */
+  function polySpansX(poly, zc) {
+    const xs = [];
+    const n = poly.length;
+    for (let i = 0; i < n; i++) {
+      const a = poly[i], b = poly[(i + 1) % n];
+      const z0 = a[1], z1 = b[1];
+      if (z0 === z1) continue;
+      if ((zc >= z0 && zc < z1) || (zc >= z1 && zc < z0)) {
+        xs.push(a[0] + ((zc - z0) / (z1 - z0)) * (b[0] - a[0]));
+      }
+    }
+    xs.sort((p, q) => p - q);
+    const out = [];
+    for (let i = 0; i + 1 < xs.length; i += 2) out.push([xs[i], xs[i + 1]]);
+    return out;
+  }
+
+  /** Is [x,z] inside the plan polygon? */
+  function pointInPoly(poly, x, z) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0], zi = poly[i][1], xj = poly[j][0], zj = poly[j][1];
+      if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+
+  /**
+   * Composite / wood decking laid board by board over an arbitrary plan
+   * polygon, boards running along +X ('ew') or +Z ('ns').
+   *
+   * Real decking is NOT one plane with a stripe texture: every board is a
+   * separate 1" x 5-1/2" extrusion with a 1/4" gap you can see daylight
+   * through, an eased edge that catches its own highlight, and a slightly
+   * different cup, tone and height from its neighbours. That, and the fact
+   * that a board END lands on the polygon outline instead of running to a
+   * rectangle, is most of what makes a deck read as built rather than mapped.
+   *
+   * @param {object} o
+   * @param {Array<[number,number]>} o.poly   plan outline [x, z]
+   * @param {number} o.y                      finished deck surface, world Y
+   * @param {THREE.Material} o.material
+   * @param {'ew'|'ns'} [o.dir='ew']
+   * @param {number} [o.boardW=5.5"]  face width
+   * @param {number} [o.gap=0.25"]
+   * @param {number} [o.thickness=1"]
+   * @param {number} [o.cup=0.004]    max per-board tilt, radians
+   * @param {number} [o.seed=91]
+   * @param {number} [o.phase=0]      shifts where the first board lands
+   * @returns {THREE.Group}
+   */
+  function deckBoards(o = {}) {
+    const poly = o.poly;
+    const y = o.y === undefined ? 0 : o.y;
+    const bw = o.boardW === undefined ? inch(5.5) : o.boardW;
+    const gap = o.gap === undefined ? inch(0.25) : o.gap;
+    const th = o.thickness === undefined ? inch(1.0) : o.thickness;
+    const pitch = bw + gap;
+    const R = prng(o.seed === undefined ? 91 : o.seed);
+    const ns = o.dir === 'ns';
+    const g = G('deck surface, world coordinates');
+    g.name = o.name || 'deck:boards';
+
+    // Work in a local frame where the boards always run along +X.
+    const P = ns ? poly.map(([x, z]) => [z, -x]) : poly;
+    let a0 = Infinity, a1 = -Infinity;
+    for (const p of P) { if (p[1] < a0) a0 = p[1]; if (p[1] > a1) a1 = p[1]; }
+    const start = Math.floor((a0 - (o.phase || 0)) / pitch) * pitch + (o.phase || 0);
+
+    let i = 0;
+    for (let zc = start; zc < a1 + pitch; zc += pitch, i++) {
+      const z0 = zc, z1 = zc + bw;
+      // union of the spans at both faces so a board that only clips a corner
+      // still gets laid
+      const spans = [];
+      for (const zs of [z0 + 0.002, (z0 + z1) / 2, z1 - 0.002]) {
+        for (const s of polySpansX(P, zs)) spans.push(s);
+      }
+      if (!spans.length) continue;
+      spans.sort((p, q) => p[0] - q[0]);
+      const merged = [];
+      for (const s of spans) {
+        const last = merged[merged.length - 1];
+        if (last && s[0] <= last[1] + 0.35) last[1] = Math.max(last[1], s[1]);
+        else merged.push([s[0], s[1]]);
+      }
+      for (let k = 0; k < merged.length; k++) {
+        const [x0, x1] = merged[k];
+        const L = x1 - x0;
+        if (L < 0.30) continue;
+        const jr = R();
+        const b = box(L, th, bw, o.material, { r: inch(0.09), seg: 2, cast: false });
+        const cz = (z0 + z1) / 2;
+        const lift = (jr - 0.5) * inch(0.05);
+        if (ns) b.position.set(-cz, y - th / 2 + lift, (x0 + x1) / 2);
+        else b.position.set((x0 + x1) / 2, y - th / 2 + lift, cz);
+        if (ns) b.rotation.y = HALFPI;
+        // cupping: a board that has been in the weather never sits dead flat
+        const cup = (o.cup === undefined ? 0.005 : o.cup) * (R() - 0.5) * 2;
+        if (ns) b.rotation.x = cup; else b.rotation.z = cup;
+        b.receiveShadow = true;
+        applyUV(b, undefined, {
+          axes: 'xz',
+          size: [L, bw],
+          offset: [R() * 0.9, (i % 4) * 0.25 + R() * 0.02],
+        });
+        g.add(b);
+      }
+    }
+    return g;
+  }
+
+  /**
+   * Fascia / rim board around a deck polygon, top flush with the surface.
+   * `only` selects edges by their outward normal: 'all', or a predicate
+   * (a, b) => boolean on the two plan points.
+   */
+  function deckFascia(o = {}) {
+    const poly = o.poly;
+    const y = o.y === undefined ? 0 : o.y;
+    const drop = o.drop === undefined ? inch(9.5) : o.drop;
+    const t = o.thickness === undefined ? inch(0.9) : o.thickness;
+    const keep = typeof o.only === 'function' ? o.only : () => true;
+    const g = G('deck fascia');
+    g.name = o.name || 'deck:fascia';
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      if (!keep(a, b, i)) continue;
+      const dx = b[0] - a[0], dz = b[1] - a[1];
+      const L = Math.hypot(dx, dz);
+      if (L < 0.05) continue;
+      // extend a hair past the corner so mitres never open a 0-width slit
+      const m = box(L + t * 1.6, drop, t, o.material, { r: inch(0.07), seg: 2 });
+      m.position.set((a[0] + b[0]) / 2, y - drop / 2 - inch(0.05), (a[1] + b[1]) / 2);
+      m.rotation.y = -Math.atan2(dz, dx);
+      applyUV(m, undefined, { axes: 'xy', size: [L, drop] });
+      g.add(m);
+    }
+    return g;
+  }
+
+  /**
+   * Backless built-in deck bench: two seat boards over a rim apron on plank
+   * legs, mitred where the run changes direction. Follows a plan path.
+   *
+   * @param {object} o
+   * @param {Array<[number,number]>} o.path plan centreline of the SEAT
+   * @param {number} o.seatY  finished seat top, world Y
+   * @param {number} o.deckY  surface the legs land on
+   * @param {number} [o.seatW=11.5"] total seat depth (2 boards + gap)
+   * @param {number} [o.legSpacing=4.6]
+   */
+  function deckBench(o = {}) {
+    const path = o.path;
+    const seatY = o.seatY;
+    const deckY = o.deckY === undefined ? seatY - ft(1, 5.5) : o.deckY;
+    const m = o.material || P.deck;
+    const bw = o.boardW === undefined ? inch(5.5) : o.boardW;
+    const gap = o.gap === undefined ? inch(0.25) : o.gap;
+    const th = o.thickness === undefined ? inch(1.0) : o.thickness;
+    const apronH = o.apronH === undefined ? inch(5.5) : o.apronH;
+    const R = prng(o.seed === undefined ? 33 : o.seed);
+    const g = G('deck bench');
+    g.name = o.name || 'deck:bench';
+    const seatW = 2 * bw + gap;
+
+    for (let i = 0; i + 1 < path.length; i++) {
+      const a = path[i], b = path[i + 1];
+      const dx = b[0] - a[0], dz = b[1] - a[1];
+      const L = Math.hypot(dx, dz);
+      if (L < 0.2) continue;
+      const yaw = -Math.atan2(dz, dx);
+      const cx = (a[0] + b[0]) / 2, cz = (a[1] + b[1]) / 2;
+      const ext = i === path.length - 2 ? inch(1.5) : 0;   // slight end overrun
+
+      // two seat boards with a real gap between them
+      for (const s of [-1, 1]) {
+        const sb = box(L + ext, th, bw, m, { r: inch(0.11), seg: 2 });
+        sb.position.set(cx, seatY - th / 2, cz);
+        sb.rotation.y = yaw;
+        sb.translateZ(s * (bw + gap) / 2);
+        applyUV(sb, undefined, { axes: 'xz', size: [L, bw], offset: [R(), R()] });
+        g.add(sb);
+      }
+      // apron under the outer edge, set back so the seat overhangs it
+      const ap = box(L + ext - inch(0.5), apronH, inch(1.4), m, { r: inch(0.07), seg: 2 });
+      ap.position.set(cx, seatY - th - apronH / 2, cz);
+      ap.rotation.y = yaw;
+      ap.translateZ(seatW / 2 - inch(1.6));
+      applyUV(ap, undefined, { axes: 'xy', size: [L, apronH] });
+      g.add(ap);
+      // and a stretcher on the inner side
+      const st = box(L + ext - inch(0.5), inch(3.5), inch(1.4), m, { r: inch(0.07), seg: 2 });
+      st.position.set(cx, seatY - th - inch(1.75), cz);
+      st.rotation.y = yaw;
+      st.translateZ(-seatW / 2 + inch(1.6));
+      g.add(st);
+
+      // legs: an outer plank and a return plank, screwed through the apron
+      const legs = Math.max(2, Math.round(L / (o.legSpacing === undefined ? 4.6 : o.legSpacing)) + 1);
+      const legH = seatY - th - deckY;
+      for (let k = 0; k < legs; k++) {
+        const t = legs === 1 ? 0.5 : k / (legs - 1);
+        const px = a[0] + dx * t, pz = a[1] + dz * t;
+        const inset = t < 0.02 ? inch(3) : t > 0.98 ? -inch(3) : 0;
+        for (const s of [1, -1]) {
+          const w = s > 0 ? inch(1.5) : inch(3.5);
+          const d = s > 0 ? inch(5.0) : inch(1.5);
+          const lg = box(w, legH, d, m, { r: inch(0.06), seg: 2 });
+          lg.position.set(px, deckY + legH / 2, pz);
+          lg.rotation.y = yaw;
+          lg.translateX(inset + (s > 0 ? 0 : inch(1.4)));
+          lg.translateZ(s > 0 ? seatW / 2 - inch(3.4) : seatW / 2 - inch(1.4));
+          g.add(lg);
+        }
+        // two screw heads in the apron face over every leg, very slightly proud
+        for (const dy of [inch(1.5), inch(4.2)]) {
+          const gg = new THREE.Group();
+          gg.position.set(px, seatY - th - dy, pz);
+          gg.rotation.y = yaw;
+          const sc = cyl(inch(0.15), inch(0.15), inch(0.05), o.screwMaterial || P.iron, 10);
+          sc.rotation.x = HALFPI;
+          sc.castShadow = false;
+          gg.add(sc);
+          gg.translateX(inset);
+          gg.translateZ(seatW / 2 - inch(1.55));
+          g.add(gg);
+        }
+      }
+    }
+    return g;
+  }
+
+  /**
+   * Irregular ("crazy") flagstone paving: a jittered Voronoi tessellation of a
+   * plan polygon, every cell an individually extruded slab with a chamfered
+   * arris, a sand joint between it and its neighbours, and a fraction of a
+   * degree of settle. This is what an irregular bluestone patio actually is;
+   * a textured plane is the loudest hardscape tell there is.
+   *
+   * @param {object} o
+   * @param {Array<[number,number]>} o.poly   plan outline
+   * @param {number} o.y                      top surface, world Y
+   * @param {THREE.Material} o.material
+   * @param {number} [o.cell=2.6]   mean slab size, feet
+   * @param {number} [o.joint=0.06] sand joint width
+   * @param {number} [o.thickness=0.16]
+   * @param {number} [o.settle=0.006] max per-slab tilt, radians
+   * @param {function} [o.skip]     (x, z) => true to drop a slab
+   * @param {number} [o.seed=7]
+   * @returns {THREE.Mesh}  one merged mesh
+   */
+  function crazyPaving(o = {}) {
+    const poly = o.poly;
+    const y = o.y === undefined ? 0 : o.y;
+    const cell = o.cell === undefined ? 2.6 : o.cell;
+    const joint = o.joint === undefined ? 0.06 : o.joint;
+    const th = o.thickness === undefined ? 0.16 : o.thickness;
+    const settle = o.settle === undefined ? 0.006 : o.settle;
+    const R = prng(o.seed === undefined ? 7 : o.seed);
+
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+    for (const [x, z] of poly) {
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (z < z0) z0 = z; if (z > z1) z1 = z;
+    }
+    // jittered grid of sites — a pure random set makes slivers
+    const sites = [];
+    for (let x = x0 - cell; x < x1 + cell; x += cell) {
+      for (let z = z0 - cell; z < z1 + cell; z += cell) {
+        sites.push([x + (R() - 0.3) * cell * 0.72, z + (R() - 0.3) * cell * 0.72]);
+      }
+    }
+    const geos = [];
+    for (let i = 0; i < sites.length; i++) {
+      const s = sites[i];
+      if (!pointInPoly(poly, s[0], s[1])) continue;
+      if (o.skip && o.skip(s[0], s[1])) continue;
+      // clip the outline by the perpendicular bisector against every near site
+      let cellPoly = poly;
+      for (let j = 0; j < sites.length; j++) {
+        if (j === i) continue;
+        const t = sites[j];
+        const dx = t[0] - s[0], dz = t[1] - s[1];
+        const d2 = dx * dx + dz * dz;
+        if (d2 > cell * cell * 9) continue;
+        // keep the half-plane nearer to s
+        const mx = (s[0] + t[0]) / 2, mz = (s[1] + t[1]) / 2;
+        cellPoly = clipHalfPlane(cellPoly, mx, mz, -dx, -dz);
+        if (cellPoly.length < 3) break;
+      }
+      if (cellPoly.length < 3) continue;
+      // inset for the sand joint
+      let cx = 0, cz = 0;
+      for (const p of cellPoly) { cx += p[0]; cz += p[1]; }
+      cx /= cellPoly.length; cz /= cellPoly.length;
+      const inner = [];
+      for (const p of cellPoly) {
+        const dx = p[0] - cx, dz = p[1] - cz;
+        const d = Math.hypot(dx, dz) || 1;
+        const k = Math.max(0.2, (d - joint / 2) / d);
+        inner.push([cx + dx * k, cz + dz * k]);
+      }
+      let area = 0;
+      for (let k = 0, l = inner.length - 1; k < inner.length; l = k++) {
+        area += (inner[l][0] * inner[k][1] - inner[k][0] * inner[l][1]);
+      }
+      if (Math.abs(area / 2) < 0.35) continue;      // sliver
+
+      const shape = new THREE.Shape();
+      shape.moveTo(inner[0][0], inner[0][1]);
+      for (let k = 1; k < inner.length; k++) shape.lineTo(inner[k][0], inner[k][1]);
+      shape.closePath();
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: th, bevelEnabled: true, bevelSize: 0.022, bevelThickness: 0.018,
+        bevelSegments: 1, curveSegments: 1,
+      });
+      // shape XY -> world XZ, top face up
+      geo.rotateX(HALFPI);
+      geo.translate(0, y + (R() - 0.5) * 0.014, 0);
+      // no two flags are co-planar
+      geo.translate(-cx, -y, -cz);
+      geo.rotateX((R() - 0.5) * settle * 2);
+      geo.rotateZ((R() - 0.5) * settle * 2);
+      geo.translate(cx, y, cz);
+      geo.computeVertexNormals();
+      if (!geo.attributes.uv1) geo.setAttribute('uv1', geo.attributes.uv);
+      geos.push(geo.toNonIndexed());
+      geo.dispose();
+    }
+    if (!geos.length) return new THREE.Group();
+    const mesh = new THREE.Mesh(mergeGeometries(geos), o.material);
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    mesh.name = o.name || 'paving';
+    return mesh;
+  }
+
+  /** Sutherland–Hodgman clip of a plan polygon by the half-plane n·(p-m) >= 0. */
+  function clipHalfPlane(poly, mx, mz, nx, nz) {
+    const out = [];
+    const side = (p) => (p[0] - mx) * nx + (p[1] - mz) * nz;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      const sa = side(a), sb = side(b);
+      if (sa >= 0) out.push(a);
+      if ((sa >= 0) !== (sb >= 0)) {
+        const t = sa / (sa - sb);
+        out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Single course of rounded river cobbles along a plan path — the edging that
+   * separates every mulch bed in this yard from the lawn.
+   */
+  function cobbleEdge(o = {}) {
+    const path = o.path;
+    const y = o.y === undefined ? 0 : o.y;
+    const r0 = o.r === undefined ? 0.33 : o.r;
+    const R = prng(o.seed === undefined ? 17 : o.seed);
+    const g = G('cobble edging');
+    g.name = o.name || 'cobbleEdge';
+    const geos = [];
+    for (let i = 0; i + 1 < path.length; i++) {
+      const a = path[i], b = path[i + 1];
+      const dx = b[0] - a[0], dz = b[1] - a[1];
+      const L = Math.hypot(dx, dz);
+      const n = Math.max(1, Math.round(L / (r0 * 1.85)));
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n;
+        const rr = r0 * (0.72 + R() * 0.62);
+        const px = a[0] + dx * t + (R() - 0.5) * r0 * 0.5;
+        const pz = a[1] + dz * t + (R() - 0.5) * r0 * 0.5;
+        const geo = new THREE.IcosahedronGeometry(rr, 1);
+        const pos = geo.attributes.position;
+        for (let v = 0; v < pos.count; v++) {
+          const s = 0.90 + R() * 0.2;
+          pos.setXYZ(v, pos.getX(v) * s, pos.getY(v) * s, pos.getZ(v) * s);
+        }
+        geo.scale(1.25, 0.78, 1.0);
+        geo.rotateY(R() * TAU);
+        geo.rotateX((R() - 0.5) * 0.4);
+        geo.translate(px, y + rr * 0.30, pz);
+        geo.computeVertexNormals();
+        const nonIdx = geo.toNonIndexed();
+        if (!nonIdx.attributes.uv) {
+          const c = nonIdx.attributes.position.count;
+          nonIdx.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(c * 2), 2));
+        }
+        nonIdx.setAttribute('uv1', nonIdx.attributes.uv);
+        geos.push(nonIdx);
+        geo.dispose();
+      }
+    }
+    if (!geos.length) return g;
+    const m = new THREE.Mesh(mergeGeometries(geos), o.material);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    g.add(m);
+    return g;
+  }
+
   /**
    * Deck framing + decking.
    * @anchor bottom CENTRE of the deck footprint in plan, at grade (y = 0);
@@ -5499,6 +5917,10 @@ export function makeKit(THREE, mat, tex) {
     straightStair, returnStair, stairRailing, newelPost, turnedOakPost,
     dropBeam, supportColumn, gasFireplace, deckFrame, deckRailing,
     stoneFirePitRing, stackedStonePlanterWall, postAndBeamWall,
+
+    // exterior hardscape
+    deckBoards, deckFascia, deckBench, crazyPaving, cobbleEdge,
+    polySpansX, pointInPoly,
 
     // planting
     leafCanopy, deciduousTree, coniferTree, shrubMass, limb, cardsGeometry,

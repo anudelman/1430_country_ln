@@ -117,9 +117,15 @@ function makeLocals(ctx) {
       envMapIntensity: 0.95, aoMapIntensity: 0.5,
     }),
     /** Same boards, the rear elevation's greener cast. */
+    // MEASURED off backyard_straight_on_view_of_house: the rear elevation is
+    // distinctly OLIVE, not the greige of the street side. Sunlit siding reads
+    // 129/139/120 (G > R > B), the upper glass-box wall 129/140/115, and the
+    // shaded left wing 90/91/70. The old tint plus envMapIntensity 0.9 gave a
+    // cool BLUE-grey wall — the loudest colour tell in the whole frame, because
+    // the siding is the largest single surface in it.
     sidingRear: () => derive('sidingRear', lib.grayLapSiding, {
-      color: 0xdfe0d4, normalScale: 0.55, roughness: 0.88,
-      envMapIntensity: 0.9, aoMapIntensity: 0.5,
+      color: 0xcbd6ac, normalScale: 0.55, roughness: 0.90,
+      envMapIntensity: 0.45, aoMapIntensity: 0.5,
     }),
     /** Rough-sawn dark trim: fascia, soffit, corner boards, casings. */
     trim: () => derive('trim', lib.cherryCabinetDark, {
@@ -800,7 +806,7 @@ function buildCornerBoards(ctx, locals, grp) {
   const cw = inch(4.2);
   const runs = [
     { poly: FOOTPRINTS.first, y0: -1.4, y1: CEIL_Y.first + ASSEMBLY.floorJoist },
-    { poly: FOOTPRINTS.second, y0: LEVELS.second, y1: CEIL_Y.second + 1.0 },
+    { poly: FOOTPRINTS.second, y0: LEVELS.second, y1: 17.3 },
   ];
   for (const run of runs) {
     for (const [x, z] of run.poly) {
@@ -834,8 +840,8 @@ function buildRoofs(ctx, locals, G) {
     [42.4, 47.6, 19.9 - 2.2, -1.0, [0, 1]],    // east end of the entry cap
     [62.6, 47.0, 9.5 - 1.2, -1.0, [0, 1]],     // SE corner of the garage
     [-2.1, 47.0, 18.5 - 1.5, -1.0, [0, 1]],    // SW corner of the main block
-    [-2.1, -2.1, 18.5 - 1.5, -1.35, [0, -1]],  // NW corner
-    [42.4, -2.2, 18.5 - 1.5, -1.35, [0, -1]],  // NE of the two-storey block
+    [-1.2, -1.2, 17.4 - 0.9, -1.35, [0, -1]],  // NW corner
+    [41.3, -1.2, 17.4 - 0.9, -1.35, [0, -1]],  // NE of the two-storey block
   ];
   for (const [x, z, yTop, yBot, dir] of d) grp.add(downspout(ctx, locals, x, z, yTop, yBot, dir));
 }
@@ -1015,55 +1021,63 @@ function buildRearFeatures(ctx, locals, G) {
   // dims already punches the four sunroom lites in ext-second-0; what makes it
   // read as a BOX in backyard_straight_on_view_of_house is the heavy dark frame
   // laid over them, plus a continuous head beam and sill beam.
-  const y0 = LEVELS.second + 1.0;
-  const y1 = LEVELS.second + 7.2;
-  const zF = -inch(2.0);
-  const posts = [0.9, 7.2, 14.4, 21.0, 25.6];
+  // The glazed opening runs X 3.15 -> 23.47 in five 3'-10" lites on a 4.07 ft
+  // pitch (dims, ext-second-0). The frame members have to land ON those
+  // mullions or the box reads as a grid laid over a different grid.
+  const y0 = LEVELS.second + 0.02;
+  const y1 = y0 + 6.5;
+  const zF = -inch(1.6);
+  const posts = [3.11, 7.19, 11.26, 15.33, 19.40, 23.51];
   for (const x of posts) {
-    const p = kit.box(inch(7), y1 - y0 + ft(1, 4), inch(6), timber, { r: inch(0.08), seg: 2, uv: true });
+    const p = kit.box(inch(6.5), y1 - y0, inch(5), timber, { r: inch(0.08), seg: 2, uv: true });
     p.position.set(x, (y0 + y1) / 2, zF);
     p.castShadow = true;
     g.add(p);
   }
-  for (const [y, h] of [[y1 + inch(5), inch(11)], [y0 - inch(5), inch(10)]]) {
-    const b = kit.box(posts[posts.length - 1] - posts[0] + ft(1, 2), h, inch(7), timber,
+  const bx0 = posts[0], bx1 = posts[posts.length - 1];
+  for (const [y, h] of [[y1 + inch(4.5), inch(9)], [y0 - inch(4.5), inch(9)]]) {
+    const b = kit.box(bx1 - bx0 + inch(9), h, inch(6), timber,
       { r: inch(0.08), seg: 2, uv: true });
-    b.position.set((posts[0] + posts[posts.length - 1]) / 2, y, zF);
+    b.position.set((bx0 + bx1) / 2, y, zF);
     g.add(b);
   }
 
-  // ---- the two full-height dark fins flanking the glass box ---------------
-  for (const x of [0.28, 19.35]) {
-    const fin = kit.box(inch(8), 19.0, inch(3.4), timber, { r: inch(0.06), seg: 2, uv: true });
-    fin.position.set(x, 8.6, -inch(2.6));
+  // ---- the two dark vertical fins flanking the glass box -------------------
+  // MEASURED, and much smaller than DETAILS.md's "two storeys": in the
+  // straight-on rear photograph each is a single 9"-wide, 3'-0" stained board
+  // with eased ends, centred at Y 5.95 on the siding either side of the
+  // first-floor glass — one at X 25.0, one at X 1.8. Run full height and they
+  // become two black stripes that exist nowhere in the photograph.
+  for (const x of [25.02, 1.80]) {
+    const fin = kit.box(inch(9), 3.03, inch(1.6), timber, { r: inch(0.35), seg: 3, uv: true });
+    fin.position.set(x, 5.95, -inch(1.0));
+    fin.castShadow = true;
     g.add(fin);
   }
 
-  // ---- exterior sconce between the second-floor lites, ON ------------------
+  // ---- warm sconce on the sunroom's back wall, ON --------------------------
+  // It reads THROUGH the middle lite in the photograph (photo 890, 332 ->
+  // X 14.7, Y 14.1), i.e. it is an interior fixture, not a wall pack.
   const sc = new THREE.Group();
-  const body = kit.box(inch(5), inch(7), inch(4), locals.metal(), { r: inch(0.6), seg: 2 });
+  const body = kit.box(inch(5), inch(4.5), inch(4), locals.metal(), { r: inch(0.6), seg: 2 });
   sc.add(body);
   const lens = new THREE.Mesh(new THREE.PlaneGeometry(inch(4.2), inch(1.4)),
     mkMat(ctx, 'sconceLens', { color: 0xfff0d6, emissive: 0xffdcaa, emissiveIntensity: 4.0, roughness: 0.4 }));
-  lens.position.set(0, -inch(3.2), 0);
+  lens.position.set(0, -inch(2.4), 0);
   lens.rotation.x = Math.PI / 2;
   sc.add(lens);
-  sc.position.set(10.6, LEVELS.second + 5.6, -inch(3.5));
+  sc.position.set(14.70, 14.10, 3.05);
   g.add(sc);
-  if (ctx.lights && ctx.lights.fixtureBulb) {
-    try {
-      const b2 = ctx.lights.fixtureBulb([10.6, LEVELS.second + 5.2, -0.5],
-        { intensity: 8, temp: 2700, radius: 0.12 });
-      if (b2 && b2.group) g.add(b2.group);
-    } catch { /* optional */ }
-  }
+  const scGlow = new THREE.PointLight(0xffc887, 26, 16, 2);
+  scGlow.position.set(14.70, 13.7, 3.4);
+  g.add(scGlow);
 
   // ---- dryer vent + foundation vents --------------------------------------
   const dv = kit.cyl(inch(2.4), inch(2.4), inch(3), locals.metal(), 16);
   dv.rotation.x = Math.PI / 2;
-  dv.position.set(21.8, 3.35, -inch(1.4));
+  dv.position.set(0.9, 3.35, -inch(1.4));
   g.add(dv);
-  for (const x of [4.5, 24.0, 33.0]) {
+  for (const x of [4.5, 33.0, 46.0]) {
     const fv = kit.box(inch(14), inch(6), inch(1.2), locals.metal(), { r: inch(0.06) });
     fv.position.set(x, -0.72, -inch(1.0));
     g.add(fv);
@@ -1159,15 +1173,30 @@ function buildInteriorGlow(ctx, locals, G) {
 
   const floorM = mkMat(ctx, 'intFloor', { color: 0x9d6f43, roughness: 0.42, clearcoat: 0.5 });
   const ceilM = mkMat(ctx, 'intCeil', { color: 0xf2efe8, roughness: 0.95 });
+  const ceilDownM = mkMat(ctx, 'intCeilDown', {
+    color: 0xf2efe8, roughness: 0.95, side: THREE.BackSide,
+  });
 
-  const plate = (poly, y, m, flip) => {
+  /**
+   * A plan polygon laid flat at height `y`.
+   *
+   * `flip` used to be implemented as `rotation.x = +PI/2`, which does NOT just
+   * turn the normal over — it MIRRORS THE PLATE IN Z. Every ceiling was
+   * therefore built at z = 0..-45 instead of 0..+45, i.e. hanging over the back
+   * yard, and from the rear camera those two down-facing lids filled the entire
+   * sky with a flat 130/114/84 tan and hid the whole second storey and roof.
+   * The right way to face a plate downward is to keep the -PI/2 rotation (which
+   * gets Z right) and render its BACK side.
+   */
+  const plate = (poly, y, m, down) => {
     const shape = new THREE.Shape();
     poly.forEach(([x, z], i) => (i ? shape.lineTo(x, -z) : shape.moveTo(x, -z)));
     shape.closePath();
     const mesh2 = new THREE.Mesh(new THREE.ShapeGeometry(shape), m);
-    mesh2.rotation.x = flip ? Math.PI / 2 : -Math.PI / 2;
+    mesh2.rotation.x = -Math.PI / 2;
     mesh2.position.y = y;
     mesh2.receiveShadow = true;
+    if (down) mesh2.material = m === ceilM ? ceilDownM : m;
     g.add(mesh2);
   };
   plate(FOOTPRINTS.first, LEVELS.first + 0.02, floorM, false);
@@ -1175,13 +1204,35 @@ function buildInteriorGlow(ctx, locals, G) {
   plate(FOOTPRINTS.first, CEIL_Y.first - 0.02, ceilM, true);
   plate(FOOTPRINTS.second, CEIL_Y.second - 0.02, ceilM, true);
 
+  /* A few upright cards a couple of feet behind the glass. Without them the
+   * rear window wall is a sheet of dark blue: the photographs show a lit room
+   * with a pale wall, a warm ceiling and the far corners falling off. */
+  const cardM = mkMat(ctx, 'intCard', { color: 0xf0e3c8, roughness: 0.93, emissive: 0x2a1d0c, emissiveIntensity: 1.0 });
+  const card = (x0, z0, x1, z1, y0, y1) => {
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const c = new THREE.Mesh(new THREE.PlaneGeometry(len, y1 - y0), cardM);
+    c.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    c.rotation.y = Math.atan2(-(z1 - z0), x1 - x0);
+    c.receiveShadow = true;
+    g.add(c);
+  };
+  // behind the first-floor rear glass wall
+  card(0.6, 12.0, 24.0, 12.0, 0.0, 8.4);
+  card(0.6, 0.6, 0.6, 18.0, 0.0, 8.4);
+  // behind the sunroom glazing: the back wall of the wrap-around room
+  card(1.0, 5.2, 26.0, 5.2, LEVELS.second, LEVELS.second + 7.6);
+
+  // Every fixture is ON in every photograph, daylight or not (PHOTOGRAPHY 5.1).
+  // These are shadowless fills whose only job is to put the window plate at
+  // 0.9-1.1x the adjacent sunlit siding instead of 0.2x.
   const lamps = [
-    [10, 6.6, 8, 2700, 30], [24, 6.6, 6, 2700, 26], [8, 6.4, 26, 2700, 22],
-    [34, 6.4, 34, 2700, 20], [50, 6.6, 14, 2700, 24],
-    [10, 15.6, 6, 2700, 26], [18, 15.6, 16, 2700, 20], [30, 15.6, 38, 2700, 18],
+    [6, 6.9, 6, 44], [14, 6.9, 5, 44], [20, 6.9, 7, 40], [26, 6.9, 5, 34],
+    [8, 6.4, 16, 30], [34, 6.6, 6, 42], [46, 6.6, 10, 34], [55, 6.6, 12, 30],
+    [6, 15.9, 3.4, 40], [13, 15.9, 3.2, 40], [20, 15.9, 3.2, 40],
+    [31, 15.9, 8, 26], [12, 15.6, 16, 22],
   ];
-  for (const [x, y, z, k, i] of lamps) {
-    const l = new THREE.PointLight(0xffd9a8, i, 34, 2);
+  for (const [x, y, z, i] of lamps) {
+    const l = new THREE.PointLight(0xffd2a0, i, 30, 2);
     l.position.set(x, y, z);
     l.castShadow = false;
     g.add(l);

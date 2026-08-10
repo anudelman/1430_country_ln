@@ -274,6 +274,13 @@ export function makeMaterials(THREE, opts = {}) {
     envMapIntensity: 0.8,
   }), T('bluestone'), { normalScale: 1.0, aoMapIntensity: 1.0 }));
 
+  // The REAR patio is a pale buff limestone flagstone, not the front walk's
+  // blue-grey cleft bluestone: measured 185-218 sRGB, warm (R-B +11).
+  def('flagstoneBuff', () => withMaps(THREE, phys(THREE, {
+    metalness: 0.0,
+    envMapIntensity: 0.85,
+  }), T('flagstoneBuff'), { normalScale: 1.0, aoMapIntensity: 0.9 }));
+
   def('stackedLimestone', () => withMaps(THREE, phys(THREE, {
     metalness: 0.0,
     envMapIntensity: 0.75,

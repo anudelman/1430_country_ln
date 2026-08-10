@@ -410,9 +410,22 @@ you still think is weak, and confirm the render PNG exists and is non-blank.`;
 
 // ---------------------------------------------------------------------------
 
-const pieceIds = (args && args.pieces) || Object.keys(ALL_PIECES);
-const ROUNDS = (args && args.rounds) || 3;
+// args may arrive as an object or as a JSON string depending on the caller;
+// parse defensively and NEVER silently fall back to all pieces on a malformed
+// filter — a full 24-piece run is a budget decision, not a default.
+let A = args;
+if (typeof A === 'string') { try { A = JSON.parse(A); } catch { A = null; } }
+const requested = A && A.pieces;
+if (requested !== undefined && (!Array.isArray(requested) || requested.length === 0
+    || !requested.every(id => typeof id === 'string' && ALL_PIECES[id]))) {
+  throw new Error('room-loop: args.pieces is present but invalid: ' + JSON.stringify(requested)
+    + ' — valid ids: ' + Object.keys(ALL_PIECES).join(', '));
+}
+const pieceIds = requested || Object.keys(ALL_PIECES);
+const ROUNDS = (A && A.rounds) || 3;
 const pieces = pieceIds.map(id => ({ id, ...ALL_PIECES[id] })).filter(p => p.title);
+
+log(`args resolved: pieces=[${pieceIds.join(', ')}] rounds=${ROUNDS}`);
 
 log(`Looping ${pieces.length} piece(s) × up to ${ROUNDS} round(s): ${pieces.map(p => p.id).join(', ')}`);
 

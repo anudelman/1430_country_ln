@@ -262,7 +262,7 @@ function buildNeighbours(ctx, g) {
   grp.name = 'front:neighbours';
 
   for (const n of SITE.neighbours) {
-    if (n.id === 'nbr-rear') continue;      // owned by exterior-rear
+    if (n.rearOnly || n.id === 'nbr-rear') continue;   // owned by exterior-rear
     const [x0, z0, x1, z1] = bbox(n.poly);
     const wallM = mat(ctx, `nbrWall:${n.id}`, { color: hex(n.color), roughness: 0.94 });
     const roofM = mat(ctx, `nbrRoof:${n.id}`, { color: hex(n.roofColor || '#5b5145'), roughness: 0.93 });
@@ -344,7 +344,9 @@ export function buildSitePlanting(ctx) {
   g.name = 'site:planting';
   if (scene && scene.userData) scene.userData.__sitePlanting = g;
 
-  const bark = mat(ctx, 'bark', null, 'treeBark');
+  // The rear framing maples photograph PALE — a smooth silver-green bark, not
+  // the dark furrowed oak the raw map gives. One tint serves both yards.
+  const bark = mat(ctx, 'bark', { color: 0xb6b3a4, roughness: 0.95 }, 'treeBark');
   const leaf = mat(ctx, 'leaf', null, 'foliageBroadleaf');
   const needle = mat(ctx, 'needle', null, 'foliageNeedle');
   const shrubLeaf = mat(ctx, 'shrubLeaf', null, 'foliageShrub');
@@ -356,7 +358,11 @@ export function buildSitePlanting(ctx) {
   /* ---- trees ------------------------------------------------------------ */
   let n = 0;
   for (const t of SITE.trees) {
-    const near = t.at[1] > 30;                       // in the front yard
+    // "near" = close enough to a camera station that individual leaves have to
+    // resolve. Both the front hero tree AND the two trunks that frame
+    // backyard_straight_on_view_of_house qualify — the rear pair stand 13 and
+    // 20 ft off the lens and own the top third of that frame.
+    const near = t.at[1] > 30 || t.id.indexOf('-frame-') !== -1;
     const bg = t.id.startsWith('bg-');
     if (t.species === 'pine') {
       g.add(kit.coniferTree({
@@ -380,10 +386,12 @@ export function buildSitePlanting(ctx) {
         crownBase: t.crownBaseY + GRASS,
         spread: t.canopyR * 2,
         trunkR: t.trunkR,
-        // The hero tree is a SINGLE-trunk katsura that forks at ~5'6" into
-        // three limbs and opens into a flat umbrella — not a multi-stem clump.
-        stems: 1,
-        lean: t.species === 'redbud' ? 0.05 : 0.03,
+        // The front hero tree is a SINGLE-trunk katsura that forks at ~5'6"
+        // into three limbs and opens into a flat umbrella. The rear framing
+        // maple, by contrast, IS a multi-stem clump — five pale stems that
+        // splay apart on the way up — so dims may declare `stems`.
+        stems: t.stems || 1,
+        lean: t.lean !== undefined ? t.lean : (t.species === 'redbud' ? 0.05 : 0.03),
         branches: near && !bg ? 7 : 4,
         subBranches: near && !bg ? 3 : 2,
         // The hero tree is 21 ft from the lens; it has to hold up at 6x zoom.
