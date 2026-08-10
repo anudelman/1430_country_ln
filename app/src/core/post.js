@@ -81,6 +81,15 @@ export const PHOTO_DEFAULTS = Object.freeze({
   sharpenRadius: 0.9,
   saturation: 1.0,
   seed: 17.0,
+  /**
+   * Per-channel display-space gain, the camera's white balance.
+   * ACES pushes bright neutrals warm; measured on kitchen_view_1 the render's
+   * ceiling sat at [203,192,178] against the photo's neutral [189,189,189].
+   * Neutralising the lights and the environment bounce did not move it, because
+   * the skew is introduced by the tone mapping downstream of both. These gains
+   * are 189/203, 189/192, 189/178.
+   */
+  whiteBalance: [0.931, 0.984, 1.062],
 });
 
 /* ======================================================================== */
@@ -107,6 +116,7 @@ export const PhotoFinishShader = {
     uSharpen: { value: PHOTO_DEFAULTS.sharpen },
     uSharpenRadius: { value: PHOTO_DEFAULTS.sharpenRadius },
     uSeed: { value: PHOTO_DEFAULTS.seed },
+    uWhiteBalance: { value: new THREE.Vector3(...PHOTO_DEFAULTS.whiteBalance) },
   },
 
   vertexShader: /* glsl */ `
@@ -134,6 +144,7 @@ export const PhotoFinishShader = {
     uniform float uSharpen;
     uniform float uSharpenRadius;
     uniform float uSeed;
+    uniform vec3  uWhiteBalance;
 
     varying vec2 vUv;
 
@@ -239,6 +250,16 @@ export const PhotoFinishShader = {
                   + grade( fetch( uv - vec2( 0.0, d.y ) ) );
         col += uSharpen * ( col - blur * 0.25 );
       }
+
+      /* --- white balance ------------------------------------------------
+       * ACES skews bright neutrals warm. Measured on kitchen_view_1: the real
+       * photo's ceiling is [189,189,189] — dead neutral — while the render came
+       * out [203,192,178], a +25 R-B skew that survived neutralising both the
+       * light colours AND the environment bounce, because it is introduced by
+       * the tone mapping itself, downstream of all of them. A real camera fixes
+       * exactly this with a white-balance multiplier, so we do too: per-channel
+       * gain in DISPLAY space, applied after grading and sharpening.          */
+      col *= uWhiteBalance;
 
       /* --- sensor: fine grain, heaviest in the shadows ------------------ */
       float lum = dot( col, LUMA );
@@ -367,11 +388,14 @@ export function setPhotoFinish(composer, patch = {}) {
     sharpen: 'uSharpen',
     sharpenRadius: 'uSharpenRadius',
     seed: 'uSeed',
+    whiteBalance: 'uWhiteBalance',
   };
   for (const [k, v] of Object.entries(patch)) {
     const name = map[k];
     if (name && u[name]) {
-      u[name].value = v;
+      // whiteBalance arrives as [r,g,b]; the uniform is a Vector3
+      if (name === 'uWhiteBalance' && Array.isArray(v)) u[name].value.set(v[0], v[1], v[2]);
+      else u[name].value = v;
       composer.userData.params[k] = v;
     }
   }

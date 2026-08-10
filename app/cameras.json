@@ -973,12 +973,12 @@
   "fovV": 78.5,
   "shift": 0,
   "aspect": 1.522,
-  "exposure": 1.15,
+  "exposure": 1.3,
   "pixels": [
    1522,
    1000
   ],
-  "estimated": true,
+  "estimated": false,
   "note": "Kitchen from its east end looking WNW down the L. Painted greige wall cabinets wrap the left and far walls, a plaster-look hood over the slide-in gas range left of centre, black gooseneck faucet and dishwasher on the far run, panelled counter-depth fridge and a tall pantry cabinet at the right edge, white-oak island with quartz top low-right, two brass-and-black pendants. Very wide (~14.6 mm): ceiling cans at the top edge and the island counter cropped at the bottom."
  },
  "kitchen_view_2": {

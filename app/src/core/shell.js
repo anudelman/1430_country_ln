@@ -827,6 +827,63 @@ function casedOpening(ctx, o, w) {
  * arc length along the room polygon.  Without this the baseboard runs straight
  * across every doorway — which is instantly wrong and instantly visible.
  */
+/**
+ * Stretches of a room's plan loop that have NO WALL behind them.
+ *
+ * A room polygon is the room's finished inside face, so in an open plan its
+ * boundary runs straight across the thin air where the kitchen meets the
+ * breakfast nook. Cutting only at OPENINGS is not enough: an edge with no wall
+ * at all still got a full baseboard run, which then lies flat across the floor
+ * like a white plank. That is the single most visible defect in an open-plan
+ * render, and it affects the kitchen, the nook and the basement alike.
+ *
+ * So: sample along each segment and keep only what is actually backed by a wall
+ * of this level, treating "backed" as within half a wall thickness of the wall's
+ * reference line and inside its span — the same test baseCuts uses to decide
+ * which face an opening belongs to.
+ */
+function unbackedCuts(room, loop) {
+  const STEP = 0.2;          // ft — finer than any real base return
+  const SLOP = 0.09;         // ft — tolerance across the wall face
+  const walls = WALLS.filter((w) => w.level === room.level);
+  const cuts = [];
+
+  const backed = (px, pz, ue) => {
+    for (const w of walls) {
+      const { u, n, len } = frame2(w.a, w.b);
+      if (Math.abs(ue[0] * u[1] - ue[1] * u[0]) > 0.02) continue;   // not parallel
+      const off = w.align === 'outer' ? w.t / 2 : 0;
+      const ax = w.a[0] + n[0] * off;
+      const az = w.a[1] + n[1] * off;
+      const d = (px - ax) * n[0] + (pz - az) * n[1];
+      if (Math.abs(d) > w.t / 2 + SLOP) continue;
+      const s = (px - ax) * u[0] + (pz - az) * u[1];
+      if (s < -SLOP || s > len + SLOP) continue;
+      return true;
+    }
+    return false;
+  };
+
+  for (const sg of loop.seg) {
+    const ue = [(sg.B[0] - sg.A[0]) / sg.L, (sg.B[1] - sg.A[1]) / sg.L];
+    let runStart = null;
+    const n = Math.max(2, Math.ceil(sg.L / STEP));
+    for (let i = 0; i <= n; i++) {
+      const s = (sg.L * i) / n;
+      const px = sg.A[0] + ue[0] * s;
+      const pz = sg.A[1] + ue[1] * s;
+      const ok = backed(px, pz, ue);
+      if (!ok && runStart === null) runStart = s;
+      if ((ok || i === n) && runStart !== null) {
+        const end = ok ? s : sg.L;
+        if (end - runStart > 0.05) cuts.push([sg.t0 + runStart, sg.t0 + end]);
+        runStart = null;
+      }
+    }
+  }
+  return cuts;
+}
+
 function baseCuts(room) {
   const cuts = [];
   const loop = loopParam(room.poly);
@@ -861,6 +918,7 @@ function baseCuts(room) {
       cuts.push([sg.t0 + s0, sg.t0 + s1]);
     }
   }
+  cuts.push(...unbackedCuts(room, loop));
   return { loop, cuts };
 }
 

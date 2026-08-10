@@ -1079,15 +1079,27 @@ export const LIGHT_PRESETS = Object.freeze({
     // which rendered every ceiling salmon pink. docs/PHOTOGRAPHY.md measures the real ceilings at
     // a near-neutral 193-197, so the bounce is desaturated and its weight brought back near the
     // env.js default (0.15), with the ceiling lit mostly by its own boost and the walls.
-    env: { kind: 'indoor', wallColor: 0xf3f1ee, floorColor: 0xc7ab8c, intensity: 1.28,
-      wallFactor: 0.44, floorFactor: 0.20, ceilingBoost: 0.62, ceilingColor: 0xfbf9f6 },
-    sun: { azimuth: 208, elevation: 52, intensity: 9.0, color: 0xfff1da },
-    // groundColor is what lights a DOWN-facing normal, i.e. the ceiling. The
-    // reference photos put the ceiling within ~5 L of the walls (185/181);
-    // without GI only this hemisphere term can close that gap, so the "ground"
-    // here is the bright bounce off a sunlit oak floor, not a dark floor.
-    fill: { intensity: 0.62, color: 0xfff4e8, groundColor: 0xfff3e2, skyColor: 0xd9e2ec,
-      hemi: 0.66, ambient: 0.12, onAxis: 0.22 },
+    // MEASURED against listing_photos/kitchen_view_1.png, not eyeballed. The photo's
+    // ceiling samples [189,189,189] — dead neutral. The render measured [212,200,184]:
+    // 28 points warm (R-B) and 23 too bright. Every warm tint in this preset stacked
+    // multiplicatively, so they are pulled back toward neutral together rather than
+    // one being over-corrected to cancel the others.
+    // floorColor is the cast that lands on the CEILING (a down-facing normal samples the
+    // environment's lower hemisphere), so a warm oak value here tints the one surface the
+    // photo shows as dead neutral. Neutralised at MATCHED LUMINANCE — the old 0xc3ad97 has
+    // luma 176, so 0xb2b0ad keeps the ceiling's brightness while removing the +44 R-B skew.
+    // The oak's real warmth still reaches the room through the sun and the floor material;
+    // this term is only a crude stand-in for global illumination.
+    env: { kind: 'indoor', wallColor: 0xf2f2f1, floorColor: 0xb2b0ad, intensity: 1.10,
+      wallFactor: 0.44, floorFactor: 0.16, ceilingBoost: 0.44, ceilingColor: 0xffffff },
+    sun: { azimuth: 208, elevation: 52, intensity: 9.0, color: 0xfff6ea },
+    // groundColor lights a DOWN-facing normal, i.e. the ceiling, so its warmth lands
+    // squarely on the most obviously neutral surface in the photo. Kept only faintly
+    // warm. Fill intensity is also down: the photo's 1st percentile is L=12 and 0.78%
+    // of it sits below L=8, where the render reached only L=50 with 0.21% — the fill
+    // was so strong nothing in frame was allowed to go genuinely dark.
+    fill: { intensity: 0.44, color: 0xfffaf4, groundColor: 0xfdf7ee, skyColor: 0xdfe5ec,
+      hemi: 0.60, ambient: 0.10, onAxis: 0.22 },
     can: { temp: 2900, intensity: 46, angle: 0.95, penumbra: 0.85 },
     pendant: { temp: 2800, intensity: 18 },
     window: { intensity: 3.0, color: 0xdfeaf7, glowIntensity: 1.1 },
