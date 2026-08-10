@@ -298,11 +298,117 @@ function slab(ctx, w, h, d, material, name, uvAxes) {
 function floorHoles(level) {
   return VOIDS.filter((v) => v.level === level).map((v) => v.poly);
 }
+
+/**
+ * Clip hole polygons to a footprint contour.
+ *
+ * THREE.ShapeGeometry does not intersect holes with their outer contour — it
+ * triangulates on the assumption that every hole lies strictly inside. A hole
+ * that crosses the contour silently produces overlapping, flipped triangles
+ * instead of an opening. That is exactly what happened to the two-storey entry:
+ * VOIDS.entryVoid runs to z 44.593, but the first-floor footprint is notched at
+ * the entry oversail (x 27.25-39.667 stops at z 42.309), so the void crossed the
+ * edge and the foyer got capped by a solid 8.5 ft ceiling — the stair climbed
+ * into it and the vault above was unreachable. Measured proof at the time: the
+ * first-floor deck triangulated to 2818.6 sf against a 2455.0 sf expectation,
+ * i.e. MORE area than the uncut footprint.
+ *
+ * The holes are not all rectangles — entryVoid is an L (6 vertices) — so the
+ * intersection is clipped as a polygon, by half-plane. Plain Sutherland-Hodgman
+ * against every contour edge would be wrong here, because a rectilinear footprint
+ * is NOT convex and clipping by all of its half-planes collapses it to its convex
+ * hull. So only the edges the hole actually crosses are applied, and only while
+ * they reduce the number of vertices lying outside. The result is exact when a
+ * hole crosses a single edge (the real case), and degrades safely otherwise: the
+ * output is always inside the contour, and if it cannot be made so the hole is
+ * dropped rather than left to corrupt the whole plate.
+ *
+ * @param {number[][][]} holes    hole polygons, each [[x,z],...]
+ * @param {number[][]}   contour  the outer footprint polygon
+ * @returns {number[][][]} holes clipped to lie inside `contour`
+ */
+function clipHolesTo(holes, contour) {
+  if (!contour || !contour.length) return holes;
+  const EPS = 1e-6;
+  const areaOf = (p) => {
+    let a = 0;
+    for (let i = 0, n = p.length; i < n; i++) {
+      const [x0, z0] = p[i]; const [x1, z1] = p[(i + 1) % n];
+      a += x0 * z1 - x1 * z0;
+    }
+    return a / 2;
+  };
+  // Interior lies to the LEFT of each directed edge for a CCW contour.
+  const ccw = areaOf(contour) > 0;
+  /**
+   * Count vertices genuinely outside the contour.
+   *
+   * Clipping leaves vertices lying EXACTLY on a contour edge, where pointInPoly
+   * is ambiguous and typically answers "outside". Taken at face value that makes
+   * a correctly-clipped hole look like a failure and it gets dropped. So a vertex
+   * that tests outside is retested a hair toward the hole's own centroid: still
+   * outside means really outside, inside means it was only sitting on the edge.
+   */
+  const outsideCount = (p) => {
+    let cx = 0; let cz = 0;
+    for (const [x, z] of p) { cx += x; cz += z; }
+    cx /= p.length; cz /= p.length;
+    let n = 0;
+    for (const [x, z] of p) {
+      if (pointInPoly(x, z, contour)) continue;
+      const t = 1e-3; // ft — 0.012", far below any construction dimension
+      if (!pointInPoly(x + (cx - x) * t, z + (cz - z) * t, contour)) n++;
+    }
+    return n;
+  };
+
+  /** Sutherland-Hodgman clip of `poly` by the half-plane inside edge A->B. */
+  const clipHalf = (poly, [ax, az], [bx, bz]) => {
+    let nx = -(bz - az); let nz = bx - ax;          // left normal
+    if (!ccw) { nx = -nx; nz = -nz; }
+    const side = ([x, z]) => (x - ax) * nx + (z - az) * nz;
+    const out = [];
+    for (let i = 0, n = poly.length; i < n; i++) {
+      const P = poly[i]; const Q = poly[(i + 1) % n];
+      const sp = side(P); const sq = side(Q);
+      if (sp >= -EPS) out.push(P);
+      if ((sp > EPS && sq < -EPS) || (sp < -EPS && sq > EPS)) {
+        const t = sp / (sp - sq);
+        out.push([P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t]);
+      }
+    }
+    return out;
+  };
+
+  const out = [];
+  for (const hole of holes) {
+    if (!hole || hole.length < 3) continue;
+    let poly = hole.map(([x, z]) => [x, z]);
+    let bad = outsideCount(poly);
+    if (bad === 0) { out.push(hole); continue; }
+
+    for (let pass = 0; pass < contour.length * 2 && bad > 0; pass++) {
+      let improved = false;
+      for (let i = 0; i < contour.length; i++) {
+        const cand = clipHalf(poly, contour[i], contour[(i + 1) % contour.length]);
+        if (cand.length < 3) continue;
+        const candBad = outsideCount(cand);
+        if (candBad < bad && Math.abs(areaOf(cand)) > 0.01) {
+          poly = cand; bad = candBad; improved = true;
+        }
+      }
+      if (!improved) break;
+    }
+
+    if (bad === 0 && poly.length >= 3 && Math.abs(areaOf(poly)) > 0.01) out.push(poly);
+  }
+  return out;
+}
 const ABOVE = { basement: 'first', first: 'second', second: null };
 
 function buildFloors(ctx, level, handle) {
   const { THREE } = ctx;
-  const holes = floorHoles(level);
+  const holes = clipHolesTo(floorHoles(level), FOOTPRINTS[level]);
   const y = LEVELS[level];
 
   /* Base plate: the whole footprint, 1-1/2" under the finished floor.  It fills
@@ -375,12 +481,12 @@ function buildCeilings(ctx, level, handle) {
   const above = ABOVE[level];
   const vaults = VOIDS.filter((v) => v.level === 'second' && v.ceiling);
 
-  const holes = [
+  const holes = clipHolesTo([
     ...(above ? floorHoles(above) : []),
     ...SKYLIGHTS.filter((s) => s.level === level && !s.slope).map((s) => rectPolyOf(s.plan)),
     // the two-storey entry is capped by its vault, not by the flat deck
     ...(level === 'second' ? vaults.map((v) => v.poly) : []),
-  ];
+  ], FOOTPRINTS[level]);
   const material = M(ctx, 'ceilingPaint', 'wallPaintWhite');
   const depth = level === 'first' ? ASSEMBLY.floorJoist : 0.6;
   const geo = new THREE.ExtrudeGeometry(planShape(THREE, FOOTPRINTS[level], holes), {
@@ -1492,3 +1598,4 @@ export function buildShell(ctx, opts = {}) {
 
 export const build = buildShell;
 export default buildShell;
+export { clipHolesTo as __clipHolesTo };
