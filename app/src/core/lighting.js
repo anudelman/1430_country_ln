@@ -1121,12 +1121,26 @@ export const LIGHT_PRESETS = Object.freeze({
     window: { intensity: 2.4, color: 0xd8e5f2, glowIntensity: 1.0 },
     underCabinet: { temp: 3000, intensity: 2.4 },
   }),
+  // MEASURED off the listing exteriors, not assumed:
+  //   front_rightside_of_house.png — the EAST flank of the garage is brighter
+  //     than the front wall  -> the sun has a strong +X component;
+  //   front_leftside_of_house.png — the WEST flank is in deep shade while the
+  //     front wall is lit     -> the sun is south of the ridge, east of south;
+  //   backyard_straight_on_view_of_house.png — the rear wall is in soft shade
+  //     but the deck 11 ft north of it is in full sun -> elevation is high.
+  // => azimuth 132 deg (SE), elevation 56 deg: a clear late-summer late morning.
+  // Grazing incidence on the +Z facade is also what makes the 8" lap courses
+  // read as a ladder of hard shadow lines, which is the facade's signature.
   exterior: Object.freeze({
     name: 'exterior',
-    exposure: 0.92,
-    env: { kind: 'sky', turbidity: 2.4, intensity: 1.0 },
-    sun: { azimuth: 168, elevation: 54, intensity: 9.4, color: 0xfff4e0 },
-    fill: { intensity: 0.20, color: 0xdfe9f7, groundColor: 0x8f9a6d },
+    exposure: 0.95,
+    env: { kind: 'sky', turbidity: 2.3, intensity: 1.0 },
+    sun: {
+      azimuth: 132, elevation: 56, intensity: 9.6, color: 0xfff4e2,
+      hemiIntensity: 0.52, skyColor: 0x9cbde9, groundColor: 0x7e8158,
+      normalBias: 0.02, bias: -0.00035,
+    },
+    fill: { intensity: 0.16, color: 0xdfe9f7, groundColor: 0x8f9a6d },
     can: { temp: 2900, intensity: 40 },
     pendant: { temp: 2700, intensity: 18 },
     window: { intensity: 1.2, color: 0x2a2f33, glowIntensity: 0.6 },

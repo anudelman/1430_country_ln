@@ -931,9 +931,16 @@ W('w-wetbar-s', [F.xGarNotchW, c(F.zWetS, F.zGarNotchS)], [F.xE0, c(F.zWetS, F.z
 W('w-garage-w', [c(F.xGarWo, F.xGarW), c(F.zLivS, F.zGarN)], [c(F.xGarWo, F.xGarW), F.zFront0], 'first', WALL.fire, {
   note: 'garage separation, 20-minute rated door',
 });
+// CORRECTED (shell/stairs pass): this is NOT a drywall wall.  In
+// `hallway_top_of_stairs_looking_down_at_front_door.png` the west side of the
+// main flight is OPEN — oak rail, black square balusters, white skirt — and you
+// see straight through it to the foyer floor.  A 12 ft partition here would
+// wall the stair in and hide the whole railing.  kind:'guard' tells shell.js to
+// build no drywall; stairs.js builds the balustrade from STAIRS.firstToSecond.
 W('w-stair-w', [F.xStrW, F.zStrN], [F.xStrW, F.zStrS], 'first', WALL.int, {
-  h: 12.0,
-  note: 'stair well — runs past the second-floor line',
+  h: ft(3, 0),
+  kind: 'guard',
+  note: 'stair well, OPEN west side — balustrade, not drywall',
 });
 W('w-stair-head', [F.xStrW, F.zStrN], [F.xGarWo, F.zStrN], 'first');
 
@@ -954,8 +961,12 @@ W('w2-bedroom4-e', [c(S.xSwbE, S.xBthW), c(S.zHallS, S.zSouthN)], [c(S.xSwbE, S.
 W('w2-bath-e', [c(S.xBthE, S.xSbdW), c(S.zHallS, S.zSouthN)], [c(S.xBthE, S.xSbdW), S.zFront0], 'second', WALL.plumb);
 W('w2-bath-mid', [S.xBthW, c(S.zBthAS, S.zBthBN)], [S.xBthE, c(S.zBthAS, S.zBthBN)], 'second');
 W('w2-bedroom3-e', [c(S.xSbdE, S.xVoidW), S.zSouthN], [c(S.xSbdE, S.xVoidW), S.zFront0], 'second');
-W('w2-void-n', [S.xVoidW, S.zHeS], [F.xStrW, S.zHeS], 'second', WALL.int, { h: 8.0, note: 'guard-rail head' });
-W('w2-stair-w', [F.xStrW, S.zHeS], [F.xStrW, F.zStrS], 'second', WALL.int, { note: 'stair guard' });
+// Both of these are GUARDS around the two-storey opening, not partitions —
+// the balcony rail in `hallway_top_of_stairs...` runs across the head of the
+// void and turns down with the flight.  VOIDS.entryVoid.guard.segs holds the
+// same two lines; shell.js builds the rail there and no drywall here.
+W('w2-void-n', [S.xVoidW, S.zHeS], [F.xStrW, S.zHeS], 'second', WALL.int, { h: ft(3, 0), kind: 'guard', note: 'guard-rail head' });
+W('w2-stair-w', [F.xStrW, S.zHeS], [F.xStrW, F.zStrS], 'second', WALL.int, { h: ft(3, 0), kind: 'guard', note: 'stair guard' });
 
 /* ---- basement partitions ------------------------------------------- */
 W('wb-storage-s', [B.xW0, c(B.zStgNS, B.zGymN)], [B.xNwE, c(B.zStgNS, B.zGymN)], 'basement');
@@ -1038,7 +1049,10 @@ export const OPENINGS = [
     w: 3.0,
     h: ft(6, 10),
     sill: 0,
-    swing: 'left-in',
+    // CORRECTED: `foyer_view_of_front_door.png` shows the three black hinges on
+    // the RIGHT jamb and the handleset on the left, seen from inside — so the
+    // leaf is right-hand and swings in.  DETAILS.md `foyer` §B says the same.
+    swing: 'right-in',
     note: 'FRONT DOOR — dark painted panel door with a round obscure-glass light',
   },
   {
@@ -1075,7 +1089,10 @@ export const OPENINGS = [
   { wall: 'w-living-w', type: 'opening', center: 18.0, w: ft(8, 0), h: ft(8, 0), sill: 0, swing: 'cased', note: 'centre hall to living room' },
   { wall: 'w-foyer-n', type: 'opening', center: 6.0, w: ft(9, 0), h: ft(8, 0), sill: 0, swing: 'cased', note: 'foyer to centre hall' },
   { wall: 'w-foyer-w', type: 'door', center: 2.2, w: ft(2, 8), h: DH, sill: 0, swing: 'right-in', note: 'foyer to kitchen hall' },
-  { wall: 'w-closets-e', type: 'door', center: 4.0, w: ft(3, 0), h: DH, sill: 0, swing: 'bifold', note: 'foyer coat closet' },
+  // CORRECTED: the foyer coat closet is a WIDE bypass pair, not a 3'-0" single —
+  // `foyer_view_of_front_door.png` shows two full six-panel leaves side by side
+  // on one head track, ~5'-4" of opening, with round black finger pulls.
+  { wall: 'w-closets-e', type: 'door', center: 4.2, w: ft(5, 4), h: DH, sill: 0, swing: 'bifold', note: 'foyer coat closet, white six-panel bypass pair' },
   { wall: 'w-garage-w', type: 'door', center: 16.5, w: ft(3, 0), h: DH, sill: 0, swing: 'left-in', note: 'foyer to garage, 20-minute rated' },
 
   /* ---------------- second floor, exterior --------------------------- */
@@ -1094,10 +1111,10 @@ export const OPENINGS = [
     type: 'window',
     center: 4.6,
     w: 4.0,
-    h: 2.5,
-    sill: 4.1,
-    shape: 'oval',
-    note: 'OVAL PORTHOLE WINDOW over the entry — reads into the two-storey foyer',
+    h: 4.0,
+    sill: 3.1,
+    shape: 'round',
+    note: 'ROUND PORTHOLE WINDOW over the entry — reads into the two-storey foyer',
   },
   { wall: 'ext-second-4', type: 'window', center: 15.5, w: 5.0, h: 5.0, sill: 2.0, note: 'front bedroom (13\'2") ' },
   { wall: 'ext-second-4', type: 'window', center: 21.5, w: 5.0, h: 5.0, sill: 2.0, note: 'front bedroom (13\'2") ' },
@@ -1225,6 +1242,24 @@ export const SKYLIGHTS = [
     glassTint: 0.06,
     note: 'Vaulted light slot / splayed white shaft over the primary bedroom vestibule.',
   },
+  {
+    // ADDED (shell pass).  `hallway_top_of_stairs_looking_down_at_front_door.png`
+    // shows a long bright slot cut lengthwise through the vault over the
+    // stairwell — it is what lights the two-storey entry and it throws the hard
+    // white wedge across the sloped ceiling in the top-left of that frame.
+    // cameras.json already described it ("sculptural skylight slots cut across
+    // the vaulted ceiling"); it was simply missing from this table.
+    id: 'sky-upper-hall',
+    level: 'second',
+    room: 'entryVoid',
+    plan: [32.4, 27.6, 36.2, 36.6],
+    ceilY: 18.0, // the vault plane at that z (see VOIDS.entryVoid.ceiling)
+    roofY: 21.8,
+    wellSplay: 0.75,
+    glassTint: 0.05,
+    slope: true,
+    note: 'Long slot skylight in the vault over the two-storey entry / stair hall.',
+  },
 ];
 
 /* =================================================================== */
@@ -1347,7 +1382,13 @@ export const VOIDS = [
     id: 'stairWellFirst',
     label: 'Basement stair opening',
     level: 'first',
-    poly: rectPoly([B.xStrW, B.zStrN, B.xStrE, B.zStrS]),
+    // CORRECTED: the opening is only as long as the basement flight needs for
+    // headroom.  The full 12'-6" well was wrong: it left the BOTTOM three
+    // treads of the main first-to-second flight standing over a hole in the
+    // foyer floor.  6'-8" of headroom on a 7-23/32" riser is used up 3.5 treads
+    // from the top, i.e. by z = 35.3; south of that the first floor is solid
+    // and carries the foot of the main stair.
+    poly: rectPoly([B.xStrW, B.zStrN, B.xStrE, 35.3]),
     fromY: LEVELS.basement,
     toY: LEVELS.first,
     note: 'Floor opening for the basement flight, directly under the main stair.',
@@ -1415,15 +1456,18 @@ export const MASSING = {
       storeys: 1,
       cantilever: true,
       porthole: {
-        shape: 'oval',
-        center: [F.xFoyW + 8.3, CEIL_Y.second - 3.05, F.zFront0],
-        width: 4.0, // ~48"
-        height: 2.5, // ~30"
-        frame: 'paintWhite',
-        frameW: inch(3),
+        shape: 'round',
+        center: [F.xGarWo - 4.05, CEIL_Y.second - 2.9, F.zFront0],
+        width: 4.0, // ~48" outside the trim ring; ~42" of glass
+        height: 4.0, // MEASURED circular in straight_on_view_of_house_from_street.png
+        frame: 'charcoal',
+        frameW: inch(4.2),
         note:
-          'Oval fixed window ~48" x 30", white-framed, high on the sloped front wall of ' +
-          'the two-storey foyer. hallway_top_of_stairs_looking_down_at_front_door.png.',
+          'Round fixed porthole, ~48" outside diameter with a charcoal ring and ~42" of ' +
+          'glass, high on the two-storey entry wall. Measured off ' +
+          'straight_on_view_of_house_from_street.png: the glass spans 56 px where the 8" ' +
+          'siding courses run 10.7 px, i.e. 3.5 ft, and it is unambiguously CIRCULAR — the ' +
+          'earlier "oval 48x30" reading was wrong.',
       },
     },
     entryPorch: {
@@ -1554,7 +1598,9 @@ export const MASSING = {
 
   siding: {
     type: 'lapHorizontal',
-    exposure: inch(7),
+    // MEASURED: the courses run 10.7-12.0 px in straight_on_view_of_house_from_street
+    // against a 16-18 px/ft facade scale -> 8" exposure, not 7".
+    exposure: inch(8),
     color: '#6f7169', // weathered gray-green stained cedar
     trimColor: '#585a54',
     cornerBoardW: inch(4),

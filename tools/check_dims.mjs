@@ -547,7 +547,10 @@ function checkWalls() {
     seen.add(w.id);
     if (segLen(w.a, w.b) < 0.05) fail('wall', `wall "${w.id}" is degenerate`);
     if (!(w.t > 0.05 && w.t < 2.0)) fail('wall', `wall "${w.id}" has implausible thickness ${w.t}`);
-    if (!(w.h > 3 && w.h < 26)) fail('wall', `wall "${w.id}" has implausible height ${w.h}`);
+    // A kind:'guard' record is a balustrade line, not a partition: it is only
+    // ever ~3'-0" tall and shell.js builds a railing for it, no drywall.
+    const hMin = w.kind === 'guard' ? 2.4 : 3;
+    if (!(w.h > hMin && w.h < 26)) fail('wall', `wall "${w.id}" has implausible height ${w.h}`);
   }
 }
 
