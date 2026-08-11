@@ -409,6 +409,13 @@ export function cameraToPreset(camera, extra = {}) {
 /** Finished-floor datums, mirrored from dims.js so controls stay dependency-free. */
 export const FLOOR_Y = Object.freeze({ basement: -9.0, first: 0.0, second: 9.5 });
 
+/** Don't eat keystrokes aimed at the preset dropdown or any text field. */
+function isTypingTarget(el) {
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName.toUpperCase();
+  return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || el.isContentEditable === true;
+}
+
 const KEY_MAP = {
   KeyW: 'fwd', ArrowUp: 'fwd',
   KeyS: 'back', ArrowDown: 'back',
@@ -421,9 +428,14 @@ const KEY_MAP = {
 /**
  * WASD + mouse-look walkthrough controls.
  *
- * Mouse-Y drives the **lens shift**, not pitch, so verticals stay vertical in
- * the interactive view exactly as they do in the screenshots. Pass
- * `pitchMode: 'tilt'` if you really want a conventional tilting camera.
+ * `pitchMode` decides what mouse-Y does, and the two callers want opposite
+ * things. In `'shift'` mode it drives the **lens shift**, keeping verticals
+ * dead vertical the way `CONVENTIONS.md` §5 requires of the stills. In
+ * `'tilt'` mode it pitches the camera like any other first-person view.
+ *
+ * Interactive walking must use `'tilt'`: sliding the frustum under a moving
+ * observer shears the image instead of turning the head, which reads as
+ * broken. `'shift'` stays the default so the screenshot path is unchanged.
  *
  * @param {THREE.PerspectiveCamera} camera  from makeShiftCamera
  * @param {HTMLElement} domElement
@@ -439,6 +451,10 @@ const KEY_MAP = {
  * @param {number}   [o.shiftRange=0.85]
  * @param {'shift'|'tilt'} [o.pitchMode='shift']
  * @param {number}   [o.radius=0.75]       collision probe radius, feet
+ * @param {function} [o.floorSampler]      (x, z, floorY) => walking-surface Y;
+ *                                         supply `nav.makeFloorSampler()` to
+ *                                         make stairs walkable
+ * @param {number}   [o.floorEase=18]      1/s easing toward the sampled floor
  * @returns {object} controls
  */
 export function createWalkControls(camera, domElement, {
@@ -455,6 +471,8 @@ export function createWalkControls(camera, domElement, {
   pitchMode = 'shift',
   radius = 0.75,
   autoLock = true,
+  floorSampler = null,
+  floorEase = 18,
 } = {}) {
   if (!isShiftCamera(camera)) {
     throw new Error('createWalkControls: camera was not built by makeShiftCamera');
@@ -505,12 +523,23 @@ export function createWalkControls(camera, domElement, {
 
   function onClick() {
     if (!autoLock || !state.enabled) return;
-    if (el.requestPointerLock) el.requestPointerLock();
+    if (!el.requestPointerLock) return;
+    // Chrome rejects a lock request made too soon after the user exited one,
+    // and returns a promise on newer builds. Swallow it: a failed lock is a
+    // "click again" situation, not an error worth breaking the frame over.
+    try {
+      const p = el.requestPointerLock();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_) { /* older browsers throw instead */ }
+  }
+
+  function onPointerLockError() {
+    state.locked = false;
   }
 
   /* -------- keyboard -------------------------------------------------- */
   function onKeyDown(e) {
-    if (!state.enabled) return;
+    if (!state.enabled || isTypingTarget(e.target)) return;
     const k = KEY_MAP[e.code];
     if (k) {
       state.keys[k] = true;
@@ -525,6 +554,7 @@ export function createWalkControls(camera, domElement, {
   }
 
   function onKeyUp(e) {
+    if (isTypingTarget(e.target)) return;
     const k = KEY_MAP[e.code];
     if (k) state.keys[k] = false;
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') state.keys.run = false;
@@ -542,6 +572,7 @@ export function createWalkControls(camera, domElement, {
   }
   if (typeof document !== 'undefined') {
     document.addEventListener('pointerlockchange', onPointerLockChange);
+    document.addEventListener('pointerlockerror', onPointerLockError);
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
   }
@@ -569,8 +600,17 @@ export function createWalkControls(camera, domElement, {
     if (state.keys.back) wish.sub(fwd);
     if (state.keys.right) wish.add(side);
     if (state.keys.left) wish.sub(side);
-    if (state.keys.shiftUp) state.lensShift = clamp(state.lensShift + step * 0.9, -shiftRange, shiftRange);
-    if (state.keys.shiftDown) state.lensShift = clamp(state.lensShift - step * 0.9, -shiftRange, shiftRange);
+    // Q/E mean different things in the two modes. Tilting already gives you
+    // the ceiling, so there the pair raises and lowers the eye instead —
+    // useful for matching a listing photo's tripod height, and it keeps the
+    // keys alive rather than dead (tilt mode pins the lens shift to zero).
+    if (state.pitchMode === 'tilt') {
+      if (state.keys.shiftUp) state.eyeHeight = clamp(state.eyeHeight + step * 1.8, 2.6, 6.8);
+      if (state.keys.shiftDown) state.eyeHeight = clamp(state.eyeHeight - step * 1.8, 2.6, 6.8);
+    } else {
+      if (state.keys.shiftUp) state.lensShift = clamp(state.lensShift + step * 0.9, -shiftRange, shiftRange);
+      if (state.keys.shiftDown) state.lensShift = clamp(state.lensShift - step * 0.9, -shiftRange, shiftRange);
+    }
 
     let v = state.speed;
     if (state.keys.run) v *= runMultiplier;
@@ -591,6 +631,16 @@ export function createWalkControls(camera, domElement, {
     else state.velocity.x = 0;
     if (dz !== 0 && !blocked(camera.position.x, camera.position.z + dz)) camera.position.z += dz;
     else state.velocity.z = 0;
+
+    // Follow the floor under our feet, so stairs are walkable rather than
+    // something you have to jump between with the level keys.
+    if (floorSampler) {
+      const target = floorSampler(camera.position.x, camera.position.z, state.floorY);
+      if (target !== state.floorY) {
+        state.floorY += (target - state.floorY) * (1 - Math.exp(-floorEase * step));
+        if (Math.abs(target - state.floorY) < 0.005) state.floorY = target;
+      }
+    }
 
     place();
   }
@@ -636,6 +686,7 @@ export function createWalkControls(camera, domElement, {
     }
     if (typeof document !== 'undefined') {
       document.removeEventListener('pointerlockchange', onPointerLockChange);
+      document.removeEventListener('pointerlockerror', onPointerLockError);
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
     }

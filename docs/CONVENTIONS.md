@@ -175,6 +175,12 @@ estimates in this file:
 Interactive walk mode may use a normal eye height (~5.6 ft); **screenshots always use the table
 above.**
 
+**The pitch=0 rule binds the stills, not the walkthrough.** `createWalkControls` defaults to
+`pitchMode: 'shift'` so anything that captures an image keeps verticals plumb, but the interactive
+rig in `main.js` passes `pitchMode: 'tilt'`. Driving mouse-Y into the lens shift under a *moving*
+observer shears the image instead of turning the head, which reads as broken navigation; tilting is
+correct there. Nothing that writes a PNG may use tilt.
+
 ## 6. Look & render settings (locked in `renderer.js`)
 
 - `renderer.outputColorSpace = SRGBColorSpace`

@@ -205,6 +205,7 @@ async function loadModules() {
     optional('post', () => import('./core/post.js')),
     optional('dims', () => import('./core/dims.js')),
     optional('units', () => import('./core/units.js')),
+    optional('nav', () => import('./core/nav.js')),
   ]);
   // These are written later in the project; their absence is normal today.
   setStatus('loading house modules…');
@@ -413,8 +414,17 @@ function buildRenderer() {
     quality: state.quality,
     width: state.width,
     height: state.height,
-    pixelRatio: SHOT ? 1 : Math.min(W.devicePixelRatio || 1, 2),
+    // Stills render at 1:1 and are upsampled by the shot size. Interactive
+    // walking clamps to 1.5: a 2x retina buffer is 78% more pixels per frame
+    // through bloom and the photo-finish pass for a difference you cannot see
+    // while moving, and steady frame timing matters far more here than peak
+    // sharpness. A static clamp also avoids the resize hitch and visible pop
+    // that come with switching resolution on the fly.
+    pixelRatio: SHOT ? 1 : Math.min(W.devicePixelRatio || 1, 1.5),
     exposure: 1.15,
+    // Stills redraw shadows every frame; the interactive view refreshes them
+    // only when the scene actually changes. SHOT must keep the still path.
+    shadowAutoUpdate: !!SHOT,
   };
   if (mod.renderer && typeof mod.renderer.createRenderer === 'function') {
     renderer = mod.renderer.createRenderer(opts);
@@ -726,6 +736,9 @@ async function buildScene(level, only) {
   if (EXPOSURE_PARAM !== null) renderer.toneMappingExposure = EXPOSURE_PARAM;
 
   buildComposer();
+  // New geometry and new lights: the walkthrough renderer only draws shadow
+  // maps when told to, so tell it.
+  invalidateShadows();
   return scene;
 }
 
@@ -840,6 +853,7 @@ function resumeWalk() {
       controls.state.eyeHeight = WALK_EYE;
       controls.state.yaw = yaw;
       controls.state.lensShift = 0;
+      controls.state.pitch = 0;
     }
   }
   applyLens(camera, { shift: 0 });
@@ -850,8 +864,26 @@ function resumeWalk() {
   }
 }
 
+/* Navigation probes, built once from dims.js. Null when nav.js is missing,
+   which just means no collision and no stairs — never a hard failure. */
+let navCollide = null;
+let navFloor = null;
+
+function buildNav() {
+  if (!mod.nav) return;
+  try {
+    navCollide = mod.nav.makeCollider({ margin: 0.05 });
+    navFloor = mod.nav.makeFloorSampler();
+  } catch (err) {
+    warn('nav unavailable: ' + ((err && err.message) || err));
+    navCollide = null;
+    navFloor = null;
+  }
+}
+
 function buildControls() {
   if (SHOT) return;
+  if (!navCollide && !navFloor) buildNav();
   if (controls && typeof controls.dispose === 'function') controls.dispose();
   controls = null;
   if (mod.camera && typeof mod.camera.createWalkControls === 'function') {
@@ -860,6 +892,11 @@ function buildControls() {
         floorY: FLOOR_Y[state.level] || 0,
         eyeHeight: WALK_EYE,
         speed: 5.0,
+        // Tilt, never lens-shift: shifting the frustum while you walk shears
+        // the image instead of turning your head. The stills keep 'shift'.
+        pitchMode: 'tilt',
+        collide: navCollide,
+        floorSampler: navFloor,
       });
       return;
     } catch (err) {
@@ -1070,6 +1107,48 @@ function buildHud() {
   syncLevelButtons();
 }
 
+/* ---- walking between levels ------------------------------------------
+ * Only one level's geometry is in the scene at a time, so climbing the stair
+ * has to swap it — but `setLevel` teleports to that level's default station,
+ * which would yank you off the steps. This rebuilds around you instead,
+ * preserving position, yaw and velocity so the climb is continuous. */
+let crossing = false;
+
+function checkLevelCrossing() {
+  if (crossing || !controls || !controls.state || !mod.nav) return;
+  const footY = controls.state.floorY;
+  const want = mod.nav.levelAt(footY + 0.05);
+  if (want === state.level || FLOOR_Y[want] === undefined) return;
+  // Only swap once we are genuinely standing on the new level's floor, so a
+  // walker pausing mid-flight does not thrash between two scenes.
+  if (Math.abs(footY - FLOOR_Y[want]) > 0.35) return;
+
+  crossing = true;
+  const pos = camera.position.clone();
+  const yaw = controls.state.yaw;
+  const pitch = controls.state.pitch;
+  buildScene(want, state.room || undefined)
+    .then(() => {
+      camera.position.copy(pos);
+      controls.state.yaw = yaw;
+      controls.state.pitch = pitch;
+      controls.state.floorY = FLOOR_Y[want];
+      syncLevelButtons();
+      invalidateShadows();
+    })
+    .catch((err) => warn('level crossing failed: ' + ((err && err.message) || err)))
+    .finally(() => { crossing = false; });
+}
+
+/** Refresh shadow maps once; the walkthrough renderer does not auto-update. */
+function invalidateShadows() {
+  if (mod.renderer && typeof mod.renderer.invalidateShadows === 'function') {
+    mod.renderer.invalidateShadows(renderer);
+  } else if (renderer && renderer.shadowMap) {
+    renderer.shadowMap.needsUpdate = true;
+  }
+}
+
 let readoutAcc = 0;
 function updateReadout(dt) {
   if (!dom.readout || dom.readout.hidden) return;
@@ -1095,7 +1174,10 @@ function startLoop() {
   const tick = () => {
     rafId = requestAnimationFrame(tick);
     const dt = Math.min(clock.getDelta(), 0.1);
-    if (state.mode === 'walk' && controls && controls.enabled !== false) controls.update(dt);
+    if (state.mode === 'walk' && controls && controls.enabled !== false) {
+      controls.update(dt);
+      checkLevelCrossing();
+    }
     if (state.mode === 'orbit' && orbit) orbit.update();
     if (lightRig && lightRig.fill && typeof lightRig.fill.follow === 'function') lightRig.fill.follow(camera);
     drawFrame(dt);
@@ -1158,6 +1240,10 @@ function installApi() {
     get composer() { return composer; },
     get canvas() { return dom.canvas; },
     get controls() { return controls; },
+    // Handy from the console and needed by tools/walk_test.mjs to place the
+    // camera at real plan coordinates rather than hard-coded numbers.
+    get dims() { return mod.dims; },
+    get nav() { return mod.nav; },
     state,
     pieces: PIECES,
     capture: captureDataURL,

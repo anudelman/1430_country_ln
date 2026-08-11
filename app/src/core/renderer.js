@@ -131,6 +131,10 @@ function pickCanvas(canvas) {
  * @param {boolean}  [o.preserveDrawingBuffer=true]
  * @param {boolean}  [o.updateStyle=false]   let three write canvas.style.width
  * @param {string}   [o.powerPreference='high-performance']
+ * @param {boolean}  [o.shadowAutoUpdate=true]  false for the walkthrough: the
+ *   scene is static, so shadow maps are rendered on demand instead of every
+ *   frame. Call `invalidateShadows(renderer)` after any change that moves
+ *   geometry, a light, or level visibility.
  * @returns {THREE.WebGLRenderer}
  */
 export function createRenderer({
@@ -143,6 +147,7 @@ export function createRenderer({
   alpha = false,
   antialias = true,
   shadows = true,
+  shadowAutoUpdate = true,
   preserveDrawingBuffer = true,
   updateStyle = false,
   powerPreference = 'high-performance',
@@ -174,7 +179,12 @@ export function createRenderer({
   /* ---- shadows -------------------------------------------------------- */
   renderer.shadowMap.enabled = !!shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.shadowMap.autoUpdate = true;
+  // Stills re-render shadows every frame (correct, and they only draw once).
+  // The walkthrough passes false: the house and its lights never move, so a
+  // per-frame shadow pass costs a full scene draw per casting light for an
+  // identical result. Those callers invalidate explicitly on scene changes.
+  renderer.shadowMap.autoUpdate = shadowAutoUpdate;
+  if (!shadowAutoUpdate) renderer.shadowMap.needsUpdate = true;
 
   /* ---- misc ----------------------------------------------------------- */
   renderer.setClearColor(new THREE.Color(clearColor), clearAlpha);
@@ -291,6 +301,19 @@ export function disposeRenderer(renderer, composer) {
       }
     }
   }
+}
+
+/**
+ * Force one shadow-map refresh on the next frame.
+ *
+ * Only meaningful for renderers built with `shadowAutoUpdate: false` — three
+ * clears the flag itself once the maps have been rendered. Safe to call on any
+ * renderer, and cheap enough to call on every scene change.
+ *
+ * @param {THREE.WebGLRenderer} renderer
+ */
+export function invalidateShadows(renderer) {
+  if (renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = true;
 }
 
 export default createRenderer;
