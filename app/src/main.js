@@ -98,6 +98,8 @@ const dom = {
   presetJump: document.getElementById('presetJump'),
   modeBtn: document.getElementById('modeBtn'),
   qualityBtn: document.getElementById('qualityBtn'),
+  perfBtn: document.getElementById('perfBtn'),
+  fps: document.getElementById('fps'),
   readout: document.getElementById('readout'),
   warnBox: document.getElementById('warnBox'),
 };
@@ -206,6 +208,7 @@ async function loadModules() {
     optional('dims', () => import('./core/dims.js')),
     optional('units', () => import('./core/units.js')),
     optional('nav', () => import('./core/nav.js')),
+    optional('perf', () => import('./core/perf.js')),
   ]);
   // These are written later in the project; their absence is normal today.
   setStatus('loading house modules…');
@@ -388,6 +391,9 @@ const state = {
   height: SHOT ? SHOT_H : Math.max(2, Math.floor(W.innerHeight)),
   sceneKey: '',
   frames: 0,
+  // Walk-mode cost budget: thins lights and shadow casters for frame rate.
+  // Never applied to stills. `?perf=0` opts out for an apples-to-apples look.
+  perf: !SHOT && params.get('perf') !== '0',
 };
 
 let renderer = null;
@@ -520,6 +526,16 @@ function resize(width, height) {
 /* ======================================================================== */
 
 function disposeScene() {
+  // A cached level is going to be shown again — tearing down its geometry,
+  // lights and env would defeat the cache and, worse, leave the retained
+  // scene full of disposed GPU resources.
+  if (scene && isCachedScene(scene)) {
+    lightRig = null;
+    skyEnv = null;
+    indoorEnv = null;
+    scene = null;
+    return;
+  }
   if (lightRig && typeof lightRig.dispose === 'function') {
     try { lightRig.dispose(); } catch { /* ignore */ }
   }
@@ -584,9 +600,65 @@ function roomsForLevel(level, only) {
   });
 }
 
+/* Built levels, kept so walking between floors does not rebuild the world.
+ * A rebuild is a multi-second hard freeze of the render loop — by far the
+ * worst hitch in the walkthrough — and the levels are static, so the only
+ * cost of holding them is memory. Keyed exactly like `state.sceneKey`, so a
+ * quality or room change still forces a real rebuild. Never used in SHOT
+ * mode, where each still gets a clean scene. */
+const sceneCache = new Map();
+
+function isCachedScene(s) {
+  for (const v of sceneCache.values()) if (v.scene === s) return true;
+  return false;
+}
+
+/** Drop every retained level and free its GPU resources. */
+function clearSceneCache() {
+  const live = scene;
+  for (const v of sceneCache.values()) {
+    if (v.scene === live) continue;
+    if (v.lightRig && typeof v.lightRig.dispose === 'function') {
+      try { v.lightRig.dispose(); } catch { /* ignore */ }
+    }
+    if (v.skyEnv && typeof v.skyEnv.dispose === 'function') {
+      try { v.skyEnv.dispose(); } catch { /* ignore */ }
+    }
+    if (v.indoorEnv && typeof v.indoorEnv.dispose === 'function') {
+      try { v.indoorEnv.dispose(); } catch { /* ignore */ }
+    }
+    v.scene.traverse((o) => {
+      if (o.geometry && typeof o.geometry.dispose === 'function') o.geometry.dispose();
+      const m = o.material;
+      if (!m) return;
+      for (const mm of Array.isArray(m) ? m : [m]) {
+        if (!mm || typeof mm.dispose !== 'function') continue;
+        if (mm.userData && mm.userData.keep) continue;
+        mm.dispose();
+      }
+    });
+  }
+  sceneCache.clear();
+}
+
 async function buildScene(level, only) {
   const key = `${level}|${only || '*'}|${state.quality}`;
   if (key === state.sceneKey && scene) return scene;
+
+  const cached = !SHOT && sceneCache.get(key);
+  if (cached) {
+    scene = cached.scene;
+    lightRig = cached.lightRig;
+    skyEnv = cached.skyEnv;
+    indoorEnv = cached.indoorEnv;
+    state.level = level;
+    state.room = only || '';
+    state.sceneKey = key;
+    if (cached.exposure !== undefined) renderer.toneMappingExposure = cached.exposure;
+    buildComposer();
+    invalidateShadows();
+    return scene;
+  }
 
   disposeScene();
   setStatus(`building ${level}…`);
@@ -735,11 +807,78 @@ async function buildScene(level, only) {
   }
   if (EXPOSURE_PARAM !== null) renderer.toneMappingExposure = EXPOSURE_PARAM;
 
+  applyPerfBudget();
+
+  if (!SHOT) {
+    sceneCache.set(key, {
+      scene, lightRig, skyEnv, indoorEnv, exposure: renderer.toneMappingExposure,
+    });
+  }
+
   buildComposer();
   // New geometry and new lights: the walkthrough renderer only draws shadow
   // maps when told to, so tell it.
   invalidateShadows();
   return scene;
+}
+
+/* ---- walk-mode cost budget --------------------------------------------
+ * Never in SHOT mode: the stills are the reference and must keep every light
+ * and every shadow caster the rooms built. Applied at build time only —
+ * changing the visible light count forces three to recompile every material,
+ * so doing this per frame would stutter far worse than the lights cost. */
+let lightBudget = null;
+let shadowBudget = null;
+const budgetsByScene = new WeakMap();
+
+function applyPerfBudget() {
+  lightBudget = null;
+  shadowBudget = null;
+  if (SHOT || !state.perf || !mod.perf || !scene) return;
+  try {
+    lightBudget = mod.perf.applyLightBudget(scene, { perRoom: 2, loose: 6, dropRectArea: true });
+    shadowBudget = mod.perf.trimShadowCasters(scene, 1.2);
+    budgetsByScene.set(scene, { lightBudget, shadowBudget });
+    console.log(`[perf] lights ${lightBudget.before} -> ${lightBudget.after}, ` +
+      `shadow casters ${shadowBudget.before} -> ${shadowBudget.after}`);
+  } catch (err) {
+    warn('perf budget failed: ' + ((err && err.message) || err));
+    lightBudget = null;
+    shadowBudget = null;
+  }
+}
+
+/**
+ * Flip the walk-mode budget on the CURRENT level without a rebuild — the
+ * budget only ever toggles `visible` and `castShadow`, both reversible. three
+ * recompiles materials once when the light count changes, so expect a single
+ * short stall on the toggle rather than a multi-second scene rebuild.
+ */
+function setPerfMode(on) {
+  if (SHOT) return state.perf;
+  state.perf = !!on;
+  const held = budgetsByScene.get(scene);
+  if (state.perf) {
+    if (!held || !held.lightBudget || !held.lightBudget.hidden.length) applyPerfBudget();
+  } else if (held) {
+    if (held.lightBudget) held.lightBudget.restore();
+    if (held.shadowBudget) held.shadowBudget.restore();
+    budgetsByScene.delete(scene);
+    lightBudget = null;
+    shadowBudget = null;
+  }
+  // Other cached levels keep whatever budget they were built with; they get
+  // re-budgeted on the next build. Drop them so the toggle is consistent.
+  clearSceneCache();
+  if (scene) sceneCache.set(state.sceneKey, {
+    scene, lightRig, skyEnv, indoorEnv, exposure: renderer.toneMappingExposure,
+  });
+  invalidateShadows();
+  if (dom.perfBtn) {
+    dom.perfBtn.textContent = state.perf ? 'Fast' : 'Full';
+    dom.perfBtn.classList.toggle('on', state.perf);
+  }
+  return state.perf;
 }
 
 /**
@@ -1100,6 +1239,11 @@ function buildHud() {
     u.searchParams.set('quality', next);
     location.href = u.href;
   });
+  if (dom.perfBtn) {
+    dom.perfBtn.textContent = state.perf ? 'Fast' : 'Full';
+    dom.perfBtn.classList.toggle('on', state.perf);
+    dom.perfBtn.addEventListener('click', () => setPerfMode(!state.perf));
+  }
   dom.hudHead.addEventListener('click', () => {
     dom.hud.classList.toggle('collapsed');
     dom.hudToggle.textContent = dom.hud.classList.contains('collapsed') ? '+' : '–';
@@ -1110,8 +1254,9 @@ function buildHud() {
 /* ---- walking between levels ------------------------------------------
  * Only one level's geometry is in the scene at a time, so climbing the stair
  * has to swap it — but `setLevel` teleports to that level's default station,
- * which would yank you off the steps. This rebuilds around you instead,
- * preserving position, yaw and velocity so the climb is continuous. */
+ * which would yank you off the steps. This swaps around you instead,
+ * preserving position, yaw and velocity so the climb is continuous. The first
+ * crossing still pays a build; `sceneCache` makes every later one instant. */
 let crossing = false;
 
 function checkLevelCrossing() {
@@ -1149,6 +1294,36 @@ function invalidateShadows() {
   }
 }
 
+/* ---- frame-rate readout -----------------------------------------------
+ * Reports the MEDIAN and the 5% worst frame, not a running average. An
+ * average hides exactly the thing that reads as jank: a steady 60 with an
+ * occasional 150 ms hitch averages out fine and still feels broken. The
+ * "worst" figure is the one to watch. */
+const frameMs = new Float32Array(120);
+let frameAt = 0;
+let frameCount = 0;
+let fpsAcc = 0;
+
+function recordFrame(dt) {
+  frameMs[frameAt] = dt * 1000;
+  frameAt = (frameAt + 1) % frameMs.length;
+  if (frameCount < frameMs.length) frameCount++;
+}
+
+function updateFps(dt) {
+  if (!dom.fps) return;
+  fpsAcc += dt;
+  if (fpsAcc < 0.5 || frameCount < 10) return;
+  fpsAcc = 0;
+  const s = Array.prototype.slice.call(frameMs, 0, frameCount).sort((a, b) => a - b);
+  const med = s[Math.floor(s.length / 2)];
+  const p95 = s[Math.min(s.length - 1, Math.floor(s.length * 0.95))];
+  const fps = med > 0 ? 1000 / med : 0;
+  dom.fps.textContent = `${fps.toFixed(0)} fps · ${med.toFixed(1)}ms · worst ${p95.toFixed(0)}ms`;
+  dom.fps.classList.toggle('warn60', fps < 58 && fps >= 30);
+  dom.fps.classList.toggle('bad30', fps < 30);
+}
+
 let readoutAcc = 0;
 function updateReadout(dt) {
   if (!dom.readout || dom.readout.hidden) return;
@@ -1181,6 +1356,8 @@ function startLoop() {
     if (state.mode === 'orbit' && orbit) orbit.update();
     if (lightRig && lightRig.fill && typeof lightRig.fill.follow === 'function') lightRig.fill.follow(camera);
     drawFrame(dt);
+    recordFrame(dt);
+    updateFps(dt);
     updateReadout(dt);
   };
   rafId = requestAnimationFrame(tick);
@@ -1256,6 +1433,8 @@ function installApi() {
     resize,
     setLevel,
     setMode,
+    setPerfMode,
+    clearSceneCache,
     goToRoom,
     warnings: () => W.__WARNINGS__.slice(),
   };

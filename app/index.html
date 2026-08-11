@@ -73,6 +73,12 @@
   #hud .head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
   #hud .head b { font-size: 12px; letter-spacing: .05em; font-weight: 600; }
   #hud .head span { color: var(--ui-dim); font-size: 11px; margin-left: auto; }
+  /* The FPS chip sits next to the collapse caret, so it must not also claim
+     the auto margin — only the last span pushes right. */
+  #hud .head #fps { margin-left: auto; font-variant-numeric: tabular-nums; }
+  #hud .head #hudToggle { margin-left: 8px; }
+  #hud .head #fps.warn60 { color: #ffc48a; }
+  #hud .head #fps.bad30 { color: #ff9a8a; }
   #hud .body { display: flex; flex-direction: column; gap: 9px; }
   #hud label { display: block; color: var(--ui-dim); font-size: 10px;
     letter-spacing: .1em; text-transform: uppercase; margin-bottom: 3px; }
@@ -115,7 +121,7 @@
 </div>
 
 <div id="hud" hidden>
-  <div class="head" id="hudHead"><b>WALKTHROUGH</b><span id="hudToggle">–</span></div>
+  <div class="head" id="hudHead"><b>WALKTHROUGH</b><span id="fps">–</span><span id="hudToggle">–</span></div>
   <div class="body">
     <div>
       <label>Level</label>
@@ -139,6 +145,7 @@
       <div class="row">
         <button id="modeBtn" title="W A S D to walk, mouse to look, Shift to run">Walk</button>
         <button id="qualityBtn" title="draft ⇄ medium ⇄ high">high</button>
+        <button id="perfBtn" title="Fast: thins lights and shadow casters for frame rate. Full: every light the rooms built (what the stills use).">Fast</button>
       </div>
     </div>
     <div class="hint" id="hint">
