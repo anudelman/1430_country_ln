@@ -51,12 +51,33 @@ Writes `export/kitchen.glb` and `export/kitchen.cameras.json`, and round-trips
 the `.glb` back through `GLTFLoader` to prove it parses before you spend an
 evening on an install.
 
+Measured output of that command:
+
+```
+export/kitchen.glb              197.7 MB
+  3,155 meshes · 255,378 tris · 444 materials · 1,697 textures · 18 lights
+  round trip: 3,155 meshes, 444 materials, 18 lights
+  bounds 128.0 x 9.3 x 128.0 m  (= 420 x 30.6 x 420 ft)
+export/kitchen.cameras.json     7 calibrated viewpoints
+```
+
 **What is actually in that file, and why:** not the kitchen alone. `?room=`
 filters *room modules*, but `shell.js` still builds the whole shell — walls,
 floors, ceilings, every window and door. That is the right thing here: Lumen
 needs an enclosure to bounce light around, and a kitchen floating in a void
 would test nothing. So the export is **the first floor, with the kitchen as the
-only furnished room** — about 3,100 meshes.
+only furnished room**.
+
+The 420 ft bounds are the **site backdrop** — lawn, trees, neighbouring houses.
+That is also deliberate rather than an accident worth fixing: for an interior GI
+test what you see through the windows is what lights the room, and deleting it
+would leave Lumen bouncing light off nothing. It does cost file size. If you
+want it gone, the backdrop objects are named `shell:tree:*` and `shell:backdrop`
+and can be deleted in Unreal after import.
+
+197 MB is dominated by textures — 1,697 `Texture` objects, but only **83
+distinct images**, which `GLTFExporter` encodes once each. Drop `--maxtex` to
+512 to roughly quarter that if the Air is tight on disk.
 
 Two knobs matter:
 
