@@ -501,3 +501,166 @@ export function applyEnvironment(scene, envTexture, { intensity = 1, background 
 }
 
 export default { makeSkyEnv, makeIndoorEnv, applyEnvironment, sunDirection, sunTransmittance };
+
+/* ======================================================================== */
+/* Captured environment — a real reflection of the room                      */
+/* ======================================================================== */
+
+/**
+ * Replace the synthetic room box with an environment captured FROM the built
+ * scene, so reflective surfaces reflect the actual room.
+ *
+ * `makeIndoorEnv` above is a hand-tuned emissive box: a bright ceiling, mid
+ * walls, a darker floor and one bright "window" side. It is a decent stand-in
+ * for diffuse ambient and a poor one for specular — which is precisely the
+ * recorded critic gap on the kitchen: *"flat untextured stainless with no
+ * environment reflection."* Stainless reflecting a smooth gradient cannot look
+ * like stainless reflecting a room.
+ *
+ * This renders the real scene into a cube map, runs it through PMREM and hands
+ * back an environment texture. Running it twice is worth the second pass: the
+ * second capture sees the first capture's contribution, which is a crude but
+ * genuine one-bounce of indirect light — the ceiling picks up floor colour the
+ * way it does in the photographs, instead of the way it was hand-tuned to.
+ *
+ * Cost is 6 scene renders per iteration, once, at scene build. Zero per frame.
+ *
+ * `iterations` defaults to 1, i.e. the bounce is OFF. Capturing with tone
+ * mapping disabled (which is required, or the grade bakes into the reflection
+ * and is then applied a second time) leaves radiance unbounded, and a second
+ * pass that re-reflects the first one overflowed the half-float cube target's
+ * 65504 ceiling to Inf. PMREM's blur then smeared NaN across every texel and
+ * the whole scene shaded black. One capture already replaces a flat gradient
+ * with the real room, which is the point; re-enable the bounce only alongside
+ * a clamp on the captured radiance.
+ *
+ * @param {THREE.WebGLRenderer} renderer
+ * @param {THREE.Scene} scene       must already have its geometry and lights
+ * @param {object} [o]
+ * @param {number[]} [o.position=[0,0,0]] capture point, world feet
+ * @param {number} [o.resolution=256]     cube face size
+ * @param {number} [o.iterations=1]       >1 adds a bounce; see the note above
+ * @param {number} [o.near=0.1]
+ * @param {number} [o.far=400]
+ * @returns {{envTexture:THREE.Texture, renderTarget:THREE.WebGLRenderTarget, dispose:function}}
+ */
+/** Sun-disc radiance ceiling during an env capture; see captureSceneEnv. */
+const SUN_DISC_CAPTURE_CAP = 250;
+
+const DEBUG_CAPTURE = typeof location !== 'undefined' && /envdbg=1/.test(location.search);
+
+export function captureSceneEnv(renderer, scene, {
+  position = [0, 0, 0],
+  resolution = 256,
+  iterations = 1,
+  near = 0.1,
+  far = 400,
+} = {}) {
+  if (!renderer || !scene) throw new Error('captureSceneEnv: renderer and scene are required');
+
+  // The capture is linear and unbounded whatever the renderer's tone mapping
+  // says — three only applies tone mapping when drawing to the canvas, never
+  // to a render target. So the sun disc arrives at full physical magnitude,
+  // overflows the half-float cube target's 65504 ceiling to +Inf, and PMREM's
+  // lowest mip averages the entire cube: a handful of Inf texels become NaN
+  // irradiance on every surface and the whole render goes black. Four Inf
+  // texels out of 16384 were enough to do it.
+  //
+  // Clamping the disc for the duration of the capture is the cheapest correct
+  // fix. A mirror-sharp sun in a kitchen reflection is worth nothing here, and
+  // the sky gradient — which is what the room actually bounces — is untouched.
+  const suns = [];
+  scene.traverse((o) => {
+    const u = o.material && o.material.uniforms;
+    if (u && u.uSunDisc && typeof u.uSunDisc.value === 'number') {
+      suns.push({ u: u.uSunDisc, was: u.uSunDisc.value });
+      u.uSunDisc.value = Math.min(u.uSunDisc.value, SUN_DISC_CAPTURE_CAP);
+    }
+  });
+
+  // Shadow maps are frozen in walk mode; capturing before they are drawn would
+  // bake a fully-lit room into the reflections.
+  const prevShadowAuto = renderer.shadowMap.autoUpdate;
+  renderer.shadowMap.needsUpdate = true;
+
+  const spent = [];
+  let out = null;
+
+  try {
+    for (let i = 0; i < Math.max(1, iterations); i++) {
+      // The PMREM generator is built per iteration, AFTER the cube render, and
+      // disposed before the cube target is released. Hoisting it out of the
+      // loop (or freeing the cube first) produced NaN in the filtered output —
+      // a valid cube went in and a black environment came out.
+      let pmrem = null;
+      const cubeRT = new THREE.WebGLCubeRenderTarget(resolution, {
+        type: THREE.HalfFloatType,
+        colorSpace: THREE.LinearSRGBColorSpace,
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        generateMipmaps: false,
+      });
+      const cam = new THREE.CubeCamera(near, far, cubeRT);
+      cam.position.set(position[0], position[1], position[2]);
+      cam.updateMatrixWorld(true);
+      cam.update(renderer, scene);
+
+      if (DEBUG_CAPTURE) {
+        const buf = new Uint16Array(resolution * resolution * 4);
+        try {
+          renderer.readRenderTargetPixels(cubeRT, 0, 0, resolution, resolution, buf, 0);
+          let s = 0;
+          for (let k = 0; k < buf.length; k += 4) s += buf[k];
+          let lights = 0;
+          scene.traverse((o) => { if (o.isLight && o.visible) lights++; });
+          console.log(`[env dbg] iter ${i} face0 mean=${(s / (buf.length / 4)).toFixed(1)} ` +
+            `lights=${lights} children=${scene.children.length} tm=${renderer.toneMapping}`);
+        } catch (e) { console.log('[env dbg] readback failed: ' + e.message); }
+      }
+      pmrem = new THREE.PMREMGenerator(renderer);
+      const rt = pmrem.fromCubemap(cubeRT.texture);
+      pmrem.dispose();
+      pmrem = null;
+      cubeRT.dispose();
+
+      if (DEBUG_CAPTURE) {
+        const w = Math.min(64, rt.width);
+        const h = Math.min(64, rt.height);
+        const ob = new Uint16Array(w * h * 4);
+        try {
+          renderer.readRenderTargetPixels(rt, 0, 0, w, h, ob);
+          let s = 0;
+          let nan = 0;
+          for (let k = 0; k < ob.length; k += 4) {
+            s += ob[k];
+            // half-float: exponent all-ones with non-zero mantissa == NaN
+            if ((ob[k] & 0x7c00) === 0x7c00 && (ob[k] & 0x03ff) !== 0) nan++;
+          }
+          console.log(`[env dbg] iter ${i} PMREM out ${rt.width}x${rt.height} ` +
+            `mean=${(s / (ob.length / 4)).toFixed(1)} nanTexels=${nan}/${ob.length / 4}`);
+        } catch (e) { console.log('[env dbg] pmrem readback failed: ' + e.message); }
+      }
+
+      // Feed this pass back in so the next capture sees indirect light.
+      if (out) spent.push(out.renderTarget);
+      out = { renderTarget: rt, envTexture: rt.texture };
+      out.envTexture.name = `capturedEnv${i}`;
+      if (i < iterations - 1) {
+        scene.environment = out.envTexture;
+        scene.environmentIntensity = 1.0;
+      }
+    }
+  } finally {
+    for (const s2 of suns) s2.u.value = s2.was;
+    renderer.shadowMap.autoUpdate = prevShadowAuto;
+    for (const rt of spent) rt.dispose();
+  }
+
+  return {
+    envTexture: out.envTexture,
+    renderTarget: out.renderTarget,
+    dispose() {
+      out.renderTarget.dispose();
+    },
+  };
+}

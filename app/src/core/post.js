@@ -37,6 +37,7 @@ import { EffectComposer } from '../../vendor/three/postprocessing/EffectComposer
 import { RenderPass } from '../../vendor/three/postprocessing/RenderPass.js';
 import { ShaderPass } from '../../vendor/three/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from '../../vendor/three/postprocessing/UnrealBloomPass.js';
+import { GTAOPass } from '../../vendor/three/postprocessing/GTAOPass.js';
 import { qualityProfile } from './renderer.js';
 
 /* ======================================================================== */
@@ -56,6 +57,43 @@ export const BLOOM_DEFAULTS = Object.freeze({
   strength: 0.06,
   radius: 0.15,
   threshold: 0.98,
+});
+
+/**
+ * Ground-truth ambient occlusion.
+ *
+ * The recorded critic gap on the kitchen asks for exactly this: *"island casts
+ * no contact shadow on the floor, no AO at the toe-kick."* But CONVENTIONS §6
+ * forbids the other half of what naive SSAO does: *"No dark AO line in drywall
+ * corners. A wall/ceiling junction gradates smoothly 190→184 over ~150 px with
+ * no local minimum. A contact-shadow crease there is a giveaway."*
+ *
+ * Both are right, and together they are the difference between real occlusion
+ * and screen-space occlusion. A cabinet toe-kick is a genuinely occluded
+ * cavity; a 90° drywall junction is not. The way to get one without the other
+ * is a SMALL world-space radius — tight cavities darken, broad corners do not.
+ * `radius` is in feet, this project's world unit.
+ *
+ * §6 doubles as a calibration target, which is rare and worth using: aim for
+ * ≤3% darkening at a wall/ceiling junction and 3–13% under casework, and
+ * verify with tools/sample.mjs rather than by eye.
+ */
+export const GTAO_DEFAULTS = Object.freeze({
+  enabled: true,
+  /** feet. Small on purpose — see above. */
+  radius: 0.72,
+  distanceExponent: 1.0,
+  thickness: 0.5,
+  scale: 1.0,
+  samples: 16,
+  screenSpaceRadius: false,
+  /**
+   * How much of the AO is blended in. Tuned against the §6 numbers, not by
+   * eye: at 0.55/0.55ft the toe-kick darkened only 2.0% (§6 wants 3–13% under
+   * casework) while the wall/ceiling junction moved 0.07% (§6 allows ≤3%), so
+   * there was headroom to push occlusion up without creasing the drywall.
+   */
+  intensity: 0.85,
 });
 
 export const PHOTO_DEFAULTS = Object.freeze({
@@ -284,15 +322,17 @@ export const PhotoFinishShader = {
  * @param {object} [o]
  * @param {'high'|'medium'|'draft'|'thumb'} [o.quality]  defaults to the renderer's
  * @param {object|false} [o.bloom]   overrides for BLOOM_DEFAULTS, or false
+ * @param {object|false} [o.gtao]    overrides for GTAO_DEFAULTS, or false
  * @param {object|false} [o.photo]   overrides for PHOTO_DEFAULTS, or false
  * @param {number} [o.width]  defaults to the renderer's current size
  * @param {number} [o.height]
  * @param {boolean}[o.animateGrain=false]  advance the grain seed every frame
- * @returns {EffectComposer} with `.userData = { renderPass, bloomPass, photoPass }`
+ * @returns {EffectComposer} with `.userData = { renderPass, gtaoPass, bloomPass, photoPass }`
  */
 export function createComposer(renderer, scene, camera, {
   quality,
   bloom,
+  gtao,
   photo,
   width,
   height,
@@ -324,6 +364,30 @@ export function createComposer(renderer, scene, camera, {
 
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
+
+  // AO goes between the beauty pass and bloom: occlusion should darken the
+  // image before anything blooms off it, not after.
+  let gtaoPass = null;
+  const g = Object.assign({}, GTAO_DEFAULTS, gtao === false ? { enabled: false } : gtao || {});
+  if (g.enabled && profile.name !== 'thumb') {
+    try {
+      gtaoPass = new GTAOPass(scene, camera, w, h);
+      gtaoPass.output = GTAOPass.OUTPUT.Default;
+      gtaoPass.blendIntensity = g.intensity;
+      gtaoPass.updateGtaoMaterial({
+        radius: g.radius,
+        distanceExponent: g.distanceExponent,
+        thickness: g.thickness,
+        scale: g.scale,
+        samples: profile.name === 'draft' ? 8 : g.samples,
+        screenSpaceRadius: g.screenSpaceRadius,
+      });
+      composer.addPass(gtaoPass);
+    } catch (err) {
+      gtaoPass = null;
+      if (typeof console !== 'undefined') console.warn('GTAO unavailable: ' + ((err && err.message) || err));
+    }
+  }
 
   let bloomPass = null;
   const bloomOn = bloom !== false && profile.bloom;
@@ -358,6 +422,7 @@ export function createComposer(renderer, scene, camera, {
 
   composer.userData = {
     renderPass,
+    gtaoPass,
     bloomPass,
     photoPass,
     params,

@@ -81,6 +81,23 @@ const PRESET_ID = params.get('preset') || '';
 const ROOM_PARAM = params.get('room') || '';
 const LEVEL_PARAM = params.get('level') || '';
 const EXPOSURE_PARAM = params.get('exposure') ? Number(params.get('exposure')) : null;
+/**
+ * Capture the environment from the built scene instead of the synthetic room
+ * box. OFF by default — opt in with `?capenv=1`.
+ *
+ * It is off because it is not safe yet, and the reason is worth recording.
+ * Rendering into a render target is always linear and unbounded (three applies
+ * tone mapping only when drawing to the canvas), so the scene's brightest
+ * emissives overflow the half-float cube target's 65504 ceiling to +Inf. PMREM
+ * then averages the whole cube into its lowest mip, which turns those few Inf
+ * texels into NaN irradiance on every surface: the render goes fully black.
+ * Four Inf texels out of 16384 did it. Clamping the sky's sun disc was not
+ * enough — the scene has other unbounded emissives (the fixture bulbs).
+ *
+ * The fix is a clamp pass over the cube faces before PMREM, not more
+ * whack-a-mole on individual light sources. Until that exists this stays off.
+ */
+const CAPTURE_ENV = params.get('capenv') === '1';
 
 /** CONVENTIONS §5 / PHOTOGRAPHY §1.1: the reference render size. */
 const SHOT_W = num('w', 1526);
@@ -533,6 +550,7 @@ function disposeScene() {
     lightRig = null;
     skyEnv = null;
     indoorEnv = null;
+    capturedEnv = null;
     scene = null;
     return;
   }
@@ -548,6 +566,10 @@ function disposeScene() {
     try { indoorEnv.dispose(); } catch { /* ignore */ }
   }
   indoorEnv = null;
+  if (capturedEnv && typeof capturedEnv.dispose === 'function') {
+    try { capturedEnv.dispose(); } catch { /* ignore */ }
+  }
+  capturedEnv = null;
   if (!scene) return;
   scene.traverse((o) => {
     if (o.geometry && typeof o.geometry.dispose === 'function') o.geometry.dispose();
@@ -627,6 +649,9 @@ function clearSceneCache() {
     if (v.indoorEnv && typeof v.indoorEnv.dispose === 'function') {
       try { v.indoorEnv.dispose(); } catch { /* ignore */ }
     }
+    if (v.capturedEnv && typeof v.capturedEnv.dispose === 'function') {
+      try { v.capturedEnv.dispose(); } catch { /* ignore */ }
+    }
     v.scene.traverse((o) => {
       if (o.geometry && typeof o.geometry.dispose === 'function') o.geometry.dispose();
       const m = o.material;
@@ -651,6 +676,7 @@ async function buildScene(level, only) {
     lightRig = cached.lightRig;
     skyEnv = cached.skyEnv;
     indoorEnv = cached.indoorEnv;
+    capturedEnv = cached.capturedEnv;
     state.level = level;
     state.room = only || '';
     state.sceneKey = key;
@@ -809,9 +835,14 @@ async function buildScene(level, only) {
 
   applyPerfBudget();
 
+  // Capture AFTER the light budget: the environment must reflect the lighting
+  // we actually render with, and capturing the full unbudgeted rig was bright
+  // enough to overflow the half-float cube target (see captureSceneEnv).
+  captureEnvironment(isExterior, level, only);
+
   if (!SHOT) {
     sceneCache.set(key, {
-      scene, lightRig, skyEnv, indoorEnv, exposure: renderer.toneMappingExposure,
+      scene, lightRig, skyEnv, indoorEnv, capturedEnv, exposure: renderer.toneMappingExposure,
     });
   }
 
@@ -820,6 +851,48 @@ async function buildScene(level, only) {
   // maps when told to, so tell it.
   invalidateShadows();
   return scene;
+}
+
+/* ---- captured environment ---------------------------------------------
+ * The synthetic room box in env.js is a good diffuse stand-in and a poor
+ * specular one, which is exactly the recorded kitchen gap: "flat untextured
+ * stainless with no environment reflection". Once the room actually exists we
+ * can photograph it and reflect that instead. Interiors only — outdoors the
+ * sky env is already the real thing.
+ *
+ * `?capenv=0` opts out, for an A/B against the old look. */
+let capturedEnv = null;
+
+function captureEnvironment(isExterior, level, only) {
+  capturedEnv = null;
+  if (isExterior || !CAPTURE_ENV) return;
+  if (!mod.env || typeof mod.env.captureSceneEnv !== 'function') return;
+
+  try {
+    const D = mod.dims;
+    let at = null;
+    // Prefer the room being shot: a capture taken in the middle of the kitchen
+    // reflects the kitchen, not an average of the whole floor.
+    if (only && D && D.ROOMS && D.ROOMS[only] && typeof D.roomCenter === 'function') {
+      const c = D.roomCenter(only);
+      if (c) at = [c[0], (FLOOR_Y[level] || 0) + 4.5, c[1]];
+    }
+    if (!at) {
+      const fy = FLOOR_Y[level] !== undefined ? FLOOR_Y[level] : 0;
+      at = [30, fy + 4.5, 22];
+    }
+
+    capturedEnv = mod.env.captureSceneEnv(renderer, scene, {
+      position: at,
+      resolution: state.quality === 'draft' || state.quality === 'thumb' ? 128 : 256,
+      iterations: 1,
+    });
+    mod.env.applyEnvironment(scene, capturedEnv.envTexture, { intensity: 1.0, background: false });
+    console.log(`[env] captured from [${at.map((v) => v.toFixed(1)).join(', ')}]`);
+  } catch (err) {
+    warn('env capture failed: ' + ((err && err.message) || err));
+    capturedEnv = null;
+  }
 }
 
 /* ---- walk-mode cost budget --------------------------------------------
@@ -871,7 +944,7 @@ function setPerfMode(on) {
   // re-budgeted on the next build. Drop them so the toggle is consistent.
   clearSceneCache();
   if (scene) sceneCache.set(state.sceneKey, {
-    scene, lightRig, skyEnv, indoorEnv, exposure: renderer.toneMappingExposure,
+    scene, lightRig, skyEnv, indoorEnv, capturedEnv, exposure: renderer.toneMappingExposure,
   });
   invalidateShadows();
   if (dom.perfBtn) {
@@ -1421,6 +1494,7 @@ function installApi() {
     // camera at real plan coordinates rather than hard-coded numbers.
     get dims() { return mod.dims; },
     get nav() { return mod.nav; },
+    get capturedEnv() { return capturedEnv; },
     state,
     pieces: PIECES,
     capture: captureDataURL,
